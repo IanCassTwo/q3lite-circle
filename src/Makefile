@@ -75,9 +75,9 @@ Q3LITE_CORE_SRCS     = $(Q3_SRC)/qcommon/q_shared.c \
 ALL_C_SRCS   = stubs.c $(Q3LITE_CORE_SRCS) $(Q3LITE_CIRCLE_SRCS) \
                $(Q3LITE_RENDERER_SRCS) $(Q3LITE_JPEG_SRCS) $(Q3LITE_ZLIB_SRCS) \
                $(Q3LITE_BOTLIB_SRCS)
-ALL_CPP_SRCS = main.cpp kernel.cpp core1.cpp $(Q3LITE_SYS_CPPS)
+ALL_CPP_SRCS = main.cpp kernel.cpp $(Q3LITE_SYS_CPPS)
 
-MAIN_OBJS    = main.o kernel.o core1.o
+MAIN_OBJS    = main.o kernel.o 
 OTHER_CPPS   = $(notdir $(Q3LITE_SYS_CPPS:.cpp=.o))
 OTHER_CS     = $(notdir $(ALL_C_SRCS:.c=.o))
 OBJS         = $(MAIN_OBJS) $(OTHER_CPPS) $(OTHER_CS)

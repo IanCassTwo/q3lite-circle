@@ -36,7 +36,7 @@ CKernel::CKernel (void)
 	m_EMMC (&m_Interrupt, &m_Timer, &m_ActLED),	
 	m_VCHIQ (CMemorySystem::Get (), &m_Interrupt),
 	m_USBHCI (&m_Interrupt, &m_Timer, TRUE),		// TRUE: enable plug-and-play
-	m_pKeyboard (0),
+	m_pKeyboard (0)
 {
 	m_ActLED.Blink (5);	// show we are alive
 }

@@ -34,6 +34,9 @@
 #include <SDCard/emmc.h>
 #include <circle/types.h>
 #include <fatfs/ff.h>
+#include <circle/usb/usbhcidevice.h>
+#include <circle/usb/usbkeyboard.h>
+
 
 enum TShutdownMode
 {
