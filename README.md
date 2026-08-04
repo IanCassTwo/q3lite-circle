@@ -81,9 +81,7 @@ Building is a manual process right now. You have to do the following:-
 
 ### Build Circle-stdlib
 * change directory to libs/circle-stdlib
-* run 
-./configure --kernel-max-size=64 -r2
- where the -r parameter specifies Raspberry Pi model number (1, 2, 3, 4, 5, default: 1)
+* run ```./configure --kernel-max-size=64 -r2``` where the -r parameter specifies Raspberry Pi model number (1, 2, 3, 4, 5, default: 1)
 * make
 * Once the build is complete, complete the following:-
   * ```cd libs/circle/addon/linux``` and then ```make```
