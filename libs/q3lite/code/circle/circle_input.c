@@ -36,6 +36,7 @@ Bare-metal Raspberry Pi Circle Input Implementation (Stubbed)
 
 #include "../client/client.h"
 #include "../sys/sys_local.h"
+#include "input_queue.h"
 
 /*
 ===============
@@ -78,4 +79,13 @@ void IN_Frame( void )
     // Called once per frame by the client engine loop to poll input hardware.
     // When you attach Circle keyboard/mouse input drivers, you will queue 
     // engine events here using Com_QueueEvent().
+
+    // Drain ring buffer populated by Circle's USB IRQ handler
+    while (g_queueTail != g_queueHead) {
+        rawInputEvent_t ev = g_inputQueue[g_queueTail];
+        g_queueTail = (g_queueTail + 1) % INPUT_QUEUE_SIZE;
+
+        // Queue event into Quake 3's engine loop
+        Com_QueueEvent( 0, SE_KEY, ev.key, ev.down, 0, NULL );
+    }
 }

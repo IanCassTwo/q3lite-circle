@@ -89,7 +89,8 @@ include $(STDLIBHOME)/Config.mk
 include $(CIRCLEHOME)/Rules.mk
 
 # Include Paths & CFLAGS (Added -DBOTLIB)
-CFLAGS += -I"$(NEWLIBDIR)/include" \
+CFLAGS += -I. \
+	  -I"$(NEWLIBDIR)/include" \
           -I../libs/circle-stdlib/include \
           -I$(CIRCLEHOME)/addon \
           -D__CIRCLE__ -D__RASPBERRYPI__ -DHAVE_BOOLEAN -DNO_NET \

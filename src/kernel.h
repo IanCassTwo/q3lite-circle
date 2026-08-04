@@ -20,6 +20,7 @@
 #ifndef _kernel_h
 #define _kernel_h
 
+#include <cstring>
 #include <circle/actled.h>
 #include <circle/koptions.h>
 #include <circle/devicenameservice.h>
@@ -53,6 +54,8 @@ public:
 
 	boolean Initialize (void);
 
+	static void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
+	static void KeyboardRemovedHandler (CDevice *pDevice, void *pContext);
 	TShutdownMode Run (void);
 
 private:
@@ -73,6 +76,7 @@ private:
 	CVCHIQDevice		m_VCHIQ;
 	CUSBHCIDevice		m_USBHCI;
 	CUSBKeyboardDevice * volatile m_pKeyboard;
+	static CKernel *s_pThis;
 };
 
 #endif
