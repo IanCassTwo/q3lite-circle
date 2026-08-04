@@ -37,6 +37,7 @@
 #include <fatfs/ff.h>
 #include <circle/usb/usbhcidevice.h>
 #include <circle/usb/usbkeyboard.h>
+#include <circle/input/mouse.h>
 
 
 enum TShutdownMode
@@ -56,6 +57,8 @@ public:
 
 	static void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
 	static void KeyboardRemovedHandler (CDevice *pDevice, void *pContext);
+	static void MouseStatusHandler(unsigned nButtons, int nDisplacementX, int nDisplacementY, int nWheelMove);
+	static void MouseRemovedHandler (CDevice *pDevice, void *pContext);
 	TShutdownMode Run (void);
 
 private:
@@ -76,6 +79,7 @@ private:
 	CVCHIQDevice		m_VCHIQ;
 	CUSBHCIDevice		m_USBHCI;
 	CUSBKeyboardDevice * volatile m_pKeyboard;
+	CMouseDevice * volatile m_pMouse;
 	static CKernel *s_pThis;
 };
 

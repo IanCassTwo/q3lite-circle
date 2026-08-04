@@ -3,6 +3,7 @@
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
 // Copyright (C) 2014-2019  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2026 Ian Cass
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,44 +22,10 @@
 #include <circle/memory.h>
 #include <circle/logger.h>
 #include "input_queue.h"
+#include "keycodes.h"
 
 #define ROOTDRIVE "0:"
 
-// Quake 3 keycodes fallback defines (in case keycodes.h is not included directly)
-#ifndef K_TAB
-#define K_TAB         9
-#define K_ENTER       13
-#define K_ESCAPE      27
-#define K_SPACE       32
-#define K_BACKSPACE   127
-#define K_UPARROW     128
-#define K_DOWNARROW   129
-#define K_LEFTARROW   130
-#define K_RIGHTARROW  131
-#define K_ALT         132
-#define K_CTRL        133
-#define K_SHIFT       134
-#define K_F1          135
-#define K_F2          136
-#define K_F3          137
-#define K_F4          138
-#define K_F5          139
-#define K_F6          140
-#define K_F7          141
-#define K_F8          142
-#define K_F9          143
-#define K_F10         144
-#define K_F11         145
-#define K_F12         146
-#define K_INS         147
-#define K_DEL         148
-#define K_PGDN        149
-#define K_PGUP        150
-#define K_HOME        151
-#define K_END         152
-#define K_PAUSE       153
-#define K_CAPSLOCK    154
-#endif
 
 // USB HID Scancode (0x00 - 0x52) -> Quake 3 Keycode Lookup
 static const int s_UsbToQ3KeyMap[256] = {
@@ -93,7 +60,33 @@ static const int s_UsbToQ3KeyMap[256] = {
     /* 0x3A - 0x43 (F1 - F10) */ K_F1, K_F2, K_F3, K_F4, K_F5, K_F6, K_F7, K_F8, K_F9, K_F10,
     /* 0x44 - 0x45 (F11 - F12) */ K_F11, K_F12,
     /* 0x46 - 0x4E */ 0, 0, K_PAUSE, K_INS, K_HOME, K_PGUP, K_DEL, K_END, K_PGDN,
-    /* 0x4F - 0x52 */ K_RIGHTARROW, K_LEFTARROW, K_DOWNARROW, K_UPARROW
+    // --- CURSOR ARROWS (FIXED ORDER) ---
+    /* 0x4F */ K_RIGHTARROW,
+    /* 0x50 */ K_LEFTARROW,
+    /* 0x51 */ K_DOWNARROW,
+    /* 0x52 */ K_UPARROW,
+
+    // --- NUMERIC KEYPAD ---
+    /* 0x53 */ 0,          // Num Lock
+    /* 0x54 */ '/',        // KP /
+    /* 0x55 */ '*',        // KP *
+    /* 0x56 */ '-',        // KP -
+    /* 0x57 */ '+',        // KP +
+    /* 0x58 */ K_ENTER,    // KP Enter
+    /* 0x59 */ K_END,      // KP 1 / End
+    /* 0x5A */ K_DOWNARROW,// KP 2 / Down
+    /* 0x5B */ K_PGDN,     // KP 3 / PgDn
+    /* 0x5C */ K_LEFTARROW,// KP 4 / Left
+    /* 0x5D */ '5',        // KP 5
+    /* 0x5E */ K_RIGHTARROW,//KP 6 / Right
+    /* 0x5F */ K_HOME,     // KP 7 / Home
+    /* 0x60 */ K_UPARROW,  // KP 8 / Up
+    /* 0x61 */ K_PGUP,     // KP 9 / PgUp
+    /* 0x62 */ K_INS,      // KP 0 / Ins
+    /* 0x63 */ K_DEL,       // KP . / Del
+    // --- NON-US / ISO EXTRA KEYS ---
+    /* 0x64 */ '\\',        // Non-US \ and | (ISO key next to Left Shift)
+    /* 0x65 */ 0            // Application / Menu key
 };
 
 // USB HID Modifier Bitmask Offsets
@@ -104,10 +97,23 @@ static const int s_UsbToQ3KeyMap[256] = {
 #define RSHIFT_BIT (1 << 5)
 #define RALT_BIT   (1 << 6)
 
+// Quake 3 Mouse Keycodes
+#define K_MOUSE1      178
+#define K_MOUSE2      179
+#define K_MOUSE3      180
+#define K_MOUSE4      181
+#define K_MOUSE5      182
+#define K_MWHEELUP    183
+#define K_MWHEELDOWN  184
+
 // Initialize the shared ring buffer globals
 rawInputEvent_t g_inputQueue[INPUT_QUEUE_SIZE];
 volatile int g_queueHead = 0;
 volatile int g_queueTail = 0;
+
+// Global mouse motion counters
+volatile int g_mouseDeltaX = 0;
+volatile int g_mouseDeltaY = 0;
 
 LOGMODULE("kernel");
 
@@ -121,7 +127,6 @@ static void PushKeyEvent(int key, int isDown)
 {
     if (key == 0) return;
 
-    LOGNOTE("[PushKeyEvent] Key: %d, Down: %d", key, isDown);
     int next = (g_queueHead + 1) % INPUT_QUEUE_SIZE;
     if (next != g_queueTail)
     {
@@ -144,7 +149,8 @@ CKernel::CKernel (void)
 	m_EMMC (&m_Interrupt, &m_Timer, &m_ActLED),	
 	m_VCHIQ (CMemorySystem::Get (), &m_Interrupt),
 	m_USBHCI (&m_Interrupt, &m_Timer, TRUE),		// TRUE: enable plug-and-play
-	m_pKeyboard (0)
+	m_pKeyboard (0),
+	m_pMouse (0)
 {
 	s_pThis = this;
 	m_ActLED.Blink (5);	// show we are alive
@@ -228,14 +234,32 @@ TShutdownMode CKernel::Run (void)
 {
 	LOGNOTE("Compile time: " __DATE__ " " __TIME__);
 
+	// Search for USB devices
 	boolean bUpdated = m_USBHCI.UpdatePlugAndPlay ();
+
+	// Register the keyboard callbacks
 	if (bUpdated && m_pKeyboard == 0) {
 		m_pKeyboard = (CUSBKeyboardDevice *) m_DeviceNameService.GetDevice ("ukbd1", FALSE);
 		if (m_pKeyboard != 0) {
+			LOGNOTE("Keyboard found");
 			m_pKeyboard->RegisterRemovedHandler (KeyboardRemovedHandler);
 			m_pKeyboard->RegisterKeyStatusHandlerRaw (KeyStatusHandlerRaw);
+		} else {
+			LOGNOTE("Keyboard not found");
 		}
 	}
+
+	// Register the mouse callbacks
+	if (   bUpdated && m_pMouse == 0) {
+		m_pMouse = (CMouseDevice *) m_DeviceNameService.GetDevice ("mouse1", FALSE);
+		if (m_pMouse != 0) {
+			LOGNOTE("Mouse found");
+			m_pMouse->RegisterRemovedHandler (MouseRemovedHandler);
+			m_pMouse->RegisterStatusHandler (MouseStatusHandler);
+		} else {
+			LOGNOTE("Mouse not found");
+		}
+}
 
 	// Run Quake
 	_main ();
@@ -314,9 +338,58 @@ void CKernel::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned cha
 	memcpy(s_PrevKeys, RawKeys, sizeof(s_PrevKeys));
 }
 
+void CKernel::MouseStatusHandler(unsigned nButtons, int nDisplacementX, int nDisplacementY, int nWheelMove)
+{
+	assert(s_pThis != 0);
+
+	static unsigned s_nPrevButtons = 0; 
+
+	// Accumulate Mouse Movement Deltas for IN_Frame()
+	// (Note: Inverting Y displacement is typical for Quake 3 screen space)
+	g_mouseDeltaX += nDisplacementX;
+	g_mouseDeltaY += nDisplacementY;
+
+	// Process Mouse Button Deltas
+	unsigned buttonDiff = nButtons ^ s_nPrevButtons;
+	if (buttonDiff != 0)
+	{
+		if (buttonDiff & MOUSE_BUTTON_LEFT)
+			PushKeyEvent(K_MOUSE1, (nButtons & MOUSE_BUTTON_LEFT) ? 1 : 0);
+		if (buttonDiff & MOUSE_BUTTON_RIGHT)
+			PushKeyEvent(K_MOUSE2, (nButtons & MOUSE_BUTTON_RIGHT) ? 1 : 0);
+		if (buttonDiff & MOUSE_BUTTON_MIDDLE)
+			PushKeyEvent(K_MOUSE3, (nButtons & MOUSE_BUTTON_MIDDLE) ? 1 : 0);
+		if (buttonDiff & MOUSE_BUTTON_SIDE1)
+			PushKeyEvent(K_MOUSE4, (nButtons & MOUSE_BUTTON_SIDE1) ? 1 : 0);
+		if (buttonDiff & MOUSE_BUTTON_SIDE2)
+			PushKeyEvent(K_MOUSE5, (nButtons & MOUSE_BUTTON_SIDE2) ? 1 : 0);
+	}
+
+	// Process Mouse Wheel (Wheel moves produce a press + immediate release)
+	if (nWheelMove > 0)
+	{
+		PushKeyEvent(K_MWHEELUP, 1);
+		PushKeyEvent(K_MWHEELUP, 0);
+	}
+	else if (nWheelMove < 0)
+	{
+		PushKeyEvent(K_MWHEELDOWN, 1);
+		PushKeyEvent(K_MWHEELDOWN, 0);
+	}
+
+	s_nPrevButtons = nButtons;
+}
+
 void CKernel::KeyboardRemovedHandler (CDevice *pDevice, void *pContext)
 {
 	assert (s_pThis != 0);
 	LOGNOTE("Keyboard removed");
 	s_pThis->m_pKeyboard = 0;
+}
+
+void CKernel::MouseRemovedHandler (CDevice *pDevice, void *pContext)
+{
+	assert (s_pThis != 0);
+	LOGNOTE("Mouse removed");
+	s_pThis->m_pMouse = 0;
 }

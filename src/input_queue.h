@@ -16,6 +16,10 @@ extern rawInputEvent_t g_inputQueue[INPUT_QUEUE_SIZE];
 extern volatile int g_queueHead;
 extern volatile int g_queueTail;
 
+// Shared relative mouse movement accumulators
+extern volatile int g_mouseDeltaX;
+extern volatile int g_mouseDeltaY;
+
 #ifdef __cplusplus
 }
 #endif
