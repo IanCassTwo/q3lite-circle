@@ -112,5 +112,3 @@ This project is licensed under the GNU General Public License v3.0 (GPLv3) or la
 - **q3lite**: Licensed under GNU GPLv3 (or later) © cdev-tux / id Software / ioquake3 contributors.
 - **circle-stdlib**: Licensed under GNU GPLv3 © Stephan Muehlstrasser and contributors.
 - **Circle**: Licensed under GNU GPLv3 © René Stange.
-- **circle-stdlib**: Licensed under GNU GPLv3 © Stephan Muehlstrasser and contributors.
-- **Circle**: Licensed under GNU GPLv3 © René Stange.tain code derived from or inspired by these projects and remains subject to their respective licenses.
