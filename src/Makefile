@@ -22,6 +22,7 @@ Q3LITE_BOTLIB_SRCS   = $(wildcard $(Q3_SRC)/botlib/*.c)
 Q3LITE_CIRCLE_SRCS   = $(Q3_SRC)/circle/circle_glimp.c \
                        $(Q3_SRC)/circle/circle_input.c \
                        $(Q3_SRC)/circle/circle_net_ip.c \
+                       $(Q3_SRC)/circle/vm_arm7l_circle.c \
                        $(Q3_SRC)/circle/circle_gamma.c 
                        #$(Q3_SRC)/circle/vm_arm7l_circle.c
 
@@ -95,6 +96,8 @@ STDLIB_SUPPORT = 4
 include $(STDLIBHOME)/Config.mk
 include $(CIRCLEHOME)/Rules.mk
 
+# -DCIRCLE_VM_JIT_EXPERIMENTAL \
+
 # Include Paths & CFLAGS (Added -DBOTLIB)
 CFLAGS += -I. \
 	  -I"$(NEWLIBDIR)/include" \
@@ -106,7 +109,6 @@ CFLAGS += -I. \
           -DDLL_EXT=\".so\" -DQ3_LITTLE_ENDIAN -DUSE_GLES -DQGL_DIRECT \
           -mno-unaligned-access -DBOTLIB \
           -D_SYS__PTHREADTYPES_H_ \
-	  -DNO_VM_COMPILED \
 	  -DSTANDALONE \
           -I$(Q3_SRC)/qcommon \
           -I$(Q3_SRC)/client \

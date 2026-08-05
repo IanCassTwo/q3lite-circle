@@ -2,6 +2,7 @@
 ===========================================================================
 Copyright (C) 2009 David S. Miller <davem@davemloft.net>
 Copyright (C) 2013,2014 SUSE Linux Products GmbH
+Copyright (C) 2026 Ian Cass, hacked to work on Circle bare metal environment for Raspberry Pi
 
 This file is part of Q3lite Source Code.
 
@@ -30,6 +31,10 @@ Suite 120, Rockville, Maryland 20850 USA.
 ARMv7l VM by Ludwig Nussel <ludwig.nussel@suse.de>
 
 TODO: optimization
+
+Note Circle bare metal environment for Raspberry Pi does not support memory protection, so the 
+VM code is not protected from being overwritten.  This is a security risk, but it is acceptable 
+for a single-user game on a single-user system.
 
 Docu:
 http://www.coranac.com/tonc/text/asm.htm
@@ -436,10 +441,10 @@ static unsigned short can_encode(unsigned val)
 #define LDRxi(dst, base, off)  (AL | (0b010<<25) | (0b1000<<21) | (1<<20) | base<<16 | dst<<12 | rimm(off))
 #define LDRxiw(dst, base, off) (AL | (0b010<<25) | (0b1001<<21) | (1<<20) | base<<16 | dst<<12 | rimm(off))
 
-#define LDRTa(dst, base, off)  (AL | (0b011<<25) | (0b0101<<21) | (1<<20) | base<<16 | dst<<12 | off)
-#define LDRTx(dst, base, off)  (AL | (0b011<<25) | (0b0001<<21) | (1<<20) | base<<16 | dst<<12 | off)
-#define LDRTai(dst, base, off) (AL | (0b010<<25) | (0b0101<<21) | (1<<20) | base<<16 | dst<<12 | rimm(off))
-#define LDRTxi(dst, base, off) (AL | (0b010<<25) | (0b0001<<21) | (1<<20) | base<<16 | dst<<12 | rimm(off))
+#define LDRTa(dst, base, off)  (AL | (0b011<<25) | (0b0100<<21) | (1<<20) | base<<16 | dst<<12 | off)
+#define LDRTx(dst, base, off)  (AL | (0b011<<25) | (0b0000<<21) | (1<<20) | base<<16 | dst<<12 | off)
+#define LDRTai(dst, base, off) (AL | (0b010<<25) | (0b0100<<21) | (1<<20) | base<<16 | dst<<12 | rimm(off))
+#define LDRTxi(dst, base, off) (AL | (0b010<<25) | (0b0000<<21) | (1<<20) | base<<16 | dst<<12 | rimm(off))
 
 #define LDRBa(dst, base, off)  (AL | (0b011<<25) | (0b1110<<21) | (1<<20) | base<<16 | dst<<12 | off)
 #define LDRSBai(dst, base, off) (AL | (0b000<<25) | (0b0110<<21) | (1<<20) | base<<16 | dst<<12 | ((off&0xF0)<<4)|0b1101<<4|(off&0x0F))
@@ -1198,6 +1203,8 @@ void VM_Compile(vm_t *vm, vmHeader_t *header)
 
 	vm->destroy = VM_Destroy_Compiled;
 	vm->compiled = qtrue;
+	Com_Printf("VM_Compile: Successfully compiled QVM (%d bytes native code at %p)\n", 
+           vm->codeLength, vm->codeBase);
 }
 
 int VM_CallCompiled(vm_t *vm, int *args)
