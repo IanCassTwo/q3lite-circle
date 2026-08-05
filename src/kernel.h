@@ -38,6 +38,9 @@
 #include <circle/usb/usbhcidevice.h>
 #include <circle/usb/usbkeyboard.h>
 #include <circle/input/mouse.h>
+#include <circle/sound/hdmisoundbasedevice.h>
+#include <vc4/sound/vchiqsoundbasedevice.h>
+#include <circle/sound/pwmsoundbasedevice.h>
 
 
 enum TShutdownMode
@@ -60,6 +63,8 @@ public:
 	static void MouseStatusHandler(unsigned nButtons, int nDisplacementX, int nDisplacementY, int nWheelMove);
 	static void MouseRemovedHandler (CDevice *pDevice, void *pContext);
 	TShutdownMode Run (void);
+	static CKernel *Get (void) { return s_pThis; }
+	CSoundBaseDevice *GetSoundDevice (void) { return m_pHDMISound; }
 
 private:
 	// do not change this order
@@ -80,6 +85,7 @@ private:
 	CUSBHCIDevice		m_USBHCI;
 	CUSBKeyboardDevice * volatile m_pKeyboard;
 	CMouseDevice * volatile m_pMouse;
+	CSoundBaseDevice	*m_pHDMISound;
 	static CKernel *s_pThis;
 };
 

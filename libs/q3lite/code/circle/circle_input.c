@@ -83,7 +83,7 @@ IN_Init
 */
 void IN_Init( void *windowData )
 {
-    Com_Printf( "\n------- Input Initialization (Bare-Metal Stubbed) -------\n" );
+    Com_Printf( "\n------- Input Initialization (Circle USB)) -------\n" );
     // Custom USB / Keyboard / Mouse hardware drivers from Circle 
     // can be hooked up here in the future.
     Com_Printf( "---------------------------------------------------------\n" );

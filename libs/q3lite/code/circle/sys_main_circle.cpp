@@ -11,6 +11,7 @@ Bare-metal Raspberry Pi Circle System & Main Loop Implementation
 #include <circle/logger.h>
 #include <circle/types.h>
 #include <circle/alloc.h>
+#include <circle/sched/scheduler.h>
 
 extern "C" {
 #include "sys_local.h"
@@ -62,7 +63,7 @@ void CQuakeKernel::Run(void)
 {
     // Define initial engine variables passed into Com_Init
     // (e.g. Memory allocation sizes, base game path settings)
-    char commandLine[ MAX_STRING_CHARS ] = "+set com_hunkMegs 64 +set r_mode -1 +set r_customwidth 1920 +set r_customheight 1080 +map q3dm1";
+    char commandLine[ MAX_STRING_CHARS ] = "+set com_hunkMegs 64 +set r_mode -1 +set r_customwidth 1920 +set r_customheight 1080";
 
     // Set initial timing base
     Sys_Milliseconds();
@@ -76,6 +77,11 @@ void CQuakeKernel::Run(void)
     while ( 1 )
     {
         Com_Frame();
+
+        // Let other tasks have CPU
+        if (CScheduler::Get()) {
+            CScheduler::Get()->Yield();
+        }
     }
 }
 

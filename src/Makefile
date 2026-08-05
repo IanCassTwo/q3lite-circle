@@ -21,12 +21,13 @@ Q3LITE_BOTLIB_SRCS   = $(wildcard $(Q3_SRC)/botlib/*.c)
 # System and Platform port files
 Q3LITE_CIRCLE_SRCS   = $(Q3_SRC)/circle/circle_glimp.c \
                        $(Q3_SRC)/circle/circle_input.c \
-                       $(Q3_SRC)/circle/circle_snd.c \
                        $(Q3_SRC)/circle/circle_net_ip.c \
-                       $(Q3_SRC)/circle/circle_gamma.c
+                       $(Q3_SRC)/circle/circle_gamma.c 
+                       #$(Q3_SRC)/circle/vm_arm7l_circle.c
 
 Q3LITE_SYS_CPPS      = $(Q3_SRC)/circle/sys_circle.cpp \
                        $(Q3_SRC)/circle/con_circle.cpp \
+                       $(Q3_SRC)/circle/circle_snd.cpp \
                        $(Q3_SRC)/circle/sys_main_circle.cpp 
 
 # Re-enabled sv_bot.c
@@ -69,6 +70,12 @@ Q3LITE_CORE_SRCS     = $(Q3_SRC)/qcommon/q_shared.c \
                        $(Q3_SRC)/client/cl_ui.c \
                        $(Q3_SRC)/client/con_log.c \
                        $(Q3_SRC)/client/snd_main.c \
+                       $(Q3_SRC)/client/snd_codec.c \
+                       $(Q3_SRC)/client/snd_codec_wav.c \
+                       $(Q3_SRC)/client/snd_mem.c \
+                       $(Q3_SRC)/client/snd_mix.c \
+                       $(Q3_SRC)/client/snd_adpcm.c \
+                       $(Q3_SRC)/client/snd_wavelet.c \
                        $(Q3_SRC)/client/snd_dma.c
 
 # Combine all source lists
@@ -97,8 +104,9 @@ CFLAGS += -I. \
           -DOS_STRING=\"circle\" -DARCH_STRING=\"arm\" \
           -DID_INLINE=inline -DPATH_SEP=47 -DPATH_SEP_CHAR=47 -D__Q3_PATH_SEP__=47 \
           -DDLL_EXT=\".so\" -DQ3_LITTLE_ENDIAN -DUSE_GLES -DQGL_DIRECT \
-          -DNO_VM_COMPILED -mno-unaligned-access -DBOTLIB \
+          -mno-unaligned-access -DBOTLIB \
           -D_SYS__PTHREADTYPES_H_ \
+	  -DNO_VM_COMPILED \
 	  -DSTANDALONE \
           -I$(Q3_SRC)/qcommon \
           -I$(Q3_SRC)/client \
@@ -120,6 +128,7 @@ LIBS := --start-group \
        "$(NEWLIBDIR)/lib/libc.a" \
        "$(NEWLIBDIR)/lib/libm.a" \
        $(CIRCLEHOME)/addon/fatfs/libfatfs.a \
+       $(CIRCLEHOME)/lib/sound/libsound.a \
        $(CIRCLEHOME)/addon/SDCard/libsdcard.a \
        $(CIRCLEHOME)/lib/usb/libusb.a \
        $(CIRCLEHOME)/lib/input/libinput.a \
@@ -128,6 +137,7 @@ LIBS := --start-group \
        $(CIRCLEHOME)/addon/vc4/interface/vmcs_host/libvmcs_host.a \
        $(CIRCLEHOME)/addon/vc4/interface/vcos/libvcos.a \
        $(CIRCLEHOME)/addon/vc4/vchiq/libvchiq.a \
+       $(CIRCLEHOME)/addon/vc4/sound/libvchiqsound.a \
        $(CIRCLEHOME)/addon/linux/liblinuxemu.a \
        $(CIRCLEHOME)/lib/sched/libsched.a \
        $(CIRCLEHOME)/lib/fs/libfs.a \

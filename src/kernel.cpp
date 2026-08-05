@@ -106,6 +106,8 @@ static const int s_UsbToQ3KeyMap[256] = {
 #define K_MWHEELUP    183
 #define K_MWHEELDOWN  184
 
+#define SOUND_CHUNK_SIZE      (384 * 10)
+
 // Initialize the shared ring buffer globals
 rawInputEvent_t g_inputQueue[INPUT_QUEUE_SIZE];
 volatile int g_queueHead = 0;
@@ -150,7 +152,8 @@ CKernel::CKernel (void)
 	m_VCHIQ (CMemorySystem::Get (), &m_Interrupt),
 	m_USBHCI (&m_Interrupt, &m_Timer, TRUE),		// TRUE: enable plug-and-play
 	m_pKeyboard (0),
-	m_pMouse (0)
+	m_pMouse (0),
+	m_pHDMISound (0)
 {
 	s_pThis = this;
 	m_ActLED.Blink (5);	// show we are alive
@@ -158,7 +161,8 @@ CKernel::CKernel (void)
 
 CKernel::~CKernel (void)
 {
-	// Unreachable
+	delete m_pHDMISound;
+    	m_pHDMISound = 0;
 	s_pThis = 0;
 }
 
@@ -202,6 +206,24 @@ boolean CKernel::Initialize (void)
 
 	if (bOK)
 	{
+		bOK = m_VCHIQ.Initialize ();
+		LOGNOTE("Initialized VCHIQ");
+	}
+
+	if (bOK)
+	{
+		//m_pHDMISound = new CHDMISoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
+		m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationHDMI);
+		//m_pHDMISound = new CPWMSoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
+		m_pHDMISound->SetWriteFormat(SoundFormatSigned16, 2);
+	    	if (!m_pHDMISound->AllocateQueue(100))
+			LOGNOTE("Could not allocate the sound queue");
+
+	    	LOGNOTE("Initialized HDMI Sound");
+	}
+
+	if (bOK)
+	{
 		bOK = m_EMMC.Initialize ();
 		LOGNOTE("Initialized EMMC");
 	}
@@ -216,11 +238,6 @@ boolean CKernel::Initialize (void)
 		LOGNOTE("Initialized filesystem");
 	}
 
-	if (bOK)
-	{
-		bOK = m_VCHIQ.Initialize ();
-		LOGNOTE("Initialized VCHIQ");
-	}
 
 	if (bOK)
 	{
@@ -250,7 +267,7 @@ TShutdownMode CKernel::Run (void)
 	}
 
 	// Register the mouse callbacks
-	if (   bUpdated && m_pMouse == 0) {
+	if (bUpdated && m_pMouse == 0) {
 		m_pMouse = (CMouseDevice *) m_DeviceNameService.GetDevice ("mouse1", FALSE);
 		if (m_pMouse != 0) {
 			LOGNOTE("Mouse found");
@@ -259,16 +276,14 @@ TShutdownMode CKernel::Run (void)
 		} else {
 			LOGNOTE("Mouse not found");
 		}
-}
+	}
+
+	// Start the sound driver
+	if (!m_pHDMISound->Start()) 
+		LOGNOTE("Could not start the sound device!");
 
 	// Run Quake
 	_main ();
-
-	// Unreachable
-	while (1)
-	{
-		m_Scheduler.Yield ();
-	}
 
 	return ShutdownHalt;
 }
