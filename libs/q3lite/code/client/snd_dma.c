@@ -1214,29 +1214,9 @@ Called once each time through the main loop
 ============
 */
 void S_Base_Update( void ) {
-	int			i;
-	int			total;
-	channel_t	*ch;
-
 	if ( !s_soundStarted || s_soundMuted ) {
 //		Com_DPrintf ("not started or muted\n");
 		return;
-	}
-
-	//
-	// debugging output
-	//
-	if ( s_show->integer == 2 ) {
-		total = 0;
-		ch = s_channels;
-		for (i=0 ; i<MAX_CHANNELS; i++, ch++) {
-			if (ch->thesfx && (ch->leftvol || ch->rightvol) ) {
-				Com_Printf ("%d %d %s\n", ch->leftvol, ch->rightvol, ch->thesfx->soundName);
-				total++;
-			}
-		}
-		
-		Com_Printf ("----(%i)---- painted: %i\n", total, s_paintedtime);
 	}
 
 	// add raw data from streamed samples
@@ -1346,7 +1326,6 @@ void S_Update_(void) {
 	// never mix more than the complete buffer
 	if (endtime - s_soundtime > dma.fullsamples)
 		endtime = s_soundtime + dma.fullsamples;
-
 
 
 	SNDDMA_BeginPainting ();

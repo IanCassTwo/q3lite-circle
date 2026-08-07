@@ -1,197 +1,186 @@
-// circle_snd.cpp
+#include <circle/sched/scheduler.h>
+#include <circle/sound/soundbasedevice.h>
+#include <circle/types.h>
+#include <circle/alloc.h>
+#include <circle/util.h>
+#include "kernel.h"
+
 extern "C" {
+#include "../client/client.h"
 #include "../client/snd_local.h"
 }
 
-#include "kernel.h"
-#include <cstdlib>
-#include <cstring>
+typedef struct
+{
+    byte *ptr;
+    size_t len;
+} Span;
 
-static qboolean s_soundInitialised = qfalse;
-
-// Positions in MONO samples (0 .. dma.samples - 1).
-// s_ringWrite tracks what has been handed to Circle's queue from dma.buffer.
-// s_dmaPos tracks the effective playback head seen by Quake's mixer.
-static int s_ringWrite = 0;
+static boolean s_soundInitialised = FALSE;
 static int s_dmaPos = 0;
-static unsigned s_framesSubmitted = 0;
 
-static int SndWrapMonoSamplePos(unsigned nFrames)
+#define QUEUE_SIZE_FRAMES 16384 // Ring Buffer Size
+
+static Span ringReadableSpan(
+    byte *buffer,
+    size_t bufferSize,
+    size_t readPos)
+   
 {
-    return (int) ((nFrames % (unsigned) dma.fullsamples) * (unsigned) dma.channels);
+    Span s;
+    s.ptr = buffer + readPos;
+    s.len = bufferSize - readPos;
+    return s;
 }
-
-static void SndUpdateDMAPos(CSoundBaseDevice *pSound)
-{
-    if (!pSound || dma.fullsamples <= 0 || dma.channels <= 0)
-        return;
-
-    unsigned queuedFrames = pSound->GetQueueFramesAvail();
-    unsigned playedFrames = s_framesSubmitted > queuedFrames
-        ? (s_framesSubmitted - queuedFrames)
-        : 0;
-
-    s_dmaPos = SndWrapMonoSamplePos(playedFrames);
-}
-
+/*
+===============================================================================
+SNDDMA_Init
+===============================================================================
+*/
 extern "C" qboolean SNDDMA_Init(void)
 {
-    CKernel *pKernel = CKernel::Get();
-    if (!pKernel) {
-        Com_Printf("SNDDMA_Init: CKernel not initialized yet\n");
+    if (s_soundInitialised)
+        return qtrue;
+
+    CSoundBaseDevice *pSound = CKernel::Get()->GetSoundDevice();
+    if (!pSound)
+        return qfalse;
+
+    // Initialize the hardware sound device with the desired format
+    pSound->SetWriteFormat(SoundFormatSigned16, 2);
+    if (!pSound->AllocateQueueFrames(4096)) { // ~0.74s buffer space
+        Com_Printf("Failed to allocate sound queue");
         return qfalse;
     }
 
-    CSoundBaseDevice *pSound = pKernel->GetSoundDevice();
-    if (!pSound) {
-        Com_Printf("SNDDMA_Init: sound device not initialized yet\n");
+    // Start the sound driver
+    if (!pSound->Start()) {
+        Com_Printf("Could not start the sound device!");
         return qfalse;
     }
 
-    if (!pSound->IsActive()) {
-        Com_Printf("SNDDMA_Init: sound device is not active\n");
-        return qfalse;
-    }
+    // Initialize the DMA buffer structure
+    memset(&dma, 0, sizeof(dma));
 
+    // Set up the DMA buffer structure
     dma.channels = 2;
     dma.samplebits = 16;
-    dma.isfloat = 0;
-    dma.speed = 44100;
+    dma.speed = 44100; // khz
+    dma.samples = QUEUE_SIZE_FRAMES * dma.channels;
+    dma.fullsamples = QUEUE_SIZE_FRAMES;
+    dma.submission_chunk = 1; // Standard submission chunk size
 
-    // Match the engine ring size to the device queue depth where possible.
-    unsigned queueFrames = pSound->GetQueueSizeFrames();
-    if (queueFrames > 0)
-        dma.samples = (int) (queueFrames * (unsigned) dma.channels);
-    else
-        dma.samples = dma.speed / 5 * dma.channels; // ~200 ms fallback
+    // Get total buffer capacity IN BYTES
+    size_t bufferSizeBytes = dma.samples * (dma.samplebits / 8);
 
-    dma.samples -= dma.samples % dma.channels;
-    if (dma.samples <= 0)
-        dma.samples = 4096;
-
-    dma.fullsamples = dma.samples / dma.channels;
-    dma.submission_chunk = 1;
-
-    int dmasize = dma.samples * (dma.samplebits / 8);
-    dma.buffer = (unsigned char *) calloc(1, dmasize);
-    if (!dma.buffer) {
-        Com_Printf("SNDDMA_Init: failed to allocate %d bytes for dma.buffer\n", dmasize);
+    // Allocate memory for the 16bit samples
+    dma.buffer = (byte *) malloc(bufferSizeBytes);
+    if (!dma.buffer)
         return qfalse;
-    }
 
-    s_ringWrite = 0;
+    memset(dma.buffer, 0, bufferSizeBytes);
+
     s_dmaPos = 0;
-    s_framesSubmitted = 0;
-    s_soundInitialised = qtrue;
-    Com_Printf("SNDDMA_Init: initialized (%d Hz, %d ch, %d samples)\n",
-        dma.speed, dma.channels, dma.samples);
+
+    s_soundInitialised = TRUE;
+    Com_Printf("Circle Sound DMA initialized: %d Hz, %d channels, %d bits\n",
+               dma.speed, dma.channels, dma.samplebits);
+
     return qtrue;
 }
 
+/*
+===============================================================================
+SNDDMA_GetDMAPos
+===============================================================================
+*/
 extern "C" int SNDDMA_GetDMAPos(void)
 {
-    if (!s_soundInitialised) {
+    if (!s_soundInitialised)
         return 0;
-    }
 
-    CKernel *pKernel = CKernel::Get();
-    if (!pKernel)
-        return s_dmaPos;
+    CSoundBaseDevice *pSound = CKernel::Get()->GetSoundDevice();
+    if (!pSound || !pSound->IsActive())
+        return 0;
 
-    CSoundBaseDevice *pSound = pKernel->GetSoundDevice();
-    if (pSound && pSound->IsActive())
-        SndUpdateDMAPos(pSound);
+    // Get total buffer capacity IN BYTES
+    size_t bytesPerSample = dma.samplebits / 8;
+    size_t bufferSizeBytes = dma.samples * bytesPerSample;
+    if (bufferSizeBytes == 0)
+        return 0;
 
-    return s_dmaPos;
+    // Per Circle docs: GetQueueFramesAvail() is the number of frames 
+    // currently waiting in the queue to be sent to hardware!
+    unsigned queuedFrames = pSound->GetQueueFramesAvail();
+    unsigned queuedBytes = queuedFrames * dma.channels * bytesPerSample;
+
+    // Subtract queuedBytes with wrap protection:
+    // Adding bufferSizeBytes before subtracting guarantees s_dmaPos - queuedBytes 
+    // won't underflow below 0 when s_dmaPos has wrapped around to the start.
+    size_t playedBytes = (s_dmaPos + bufferSizeBytes - (queuedBytes % bufferSizeBytes)) % bufferSizeBytes;
+
+    // Convert byte position back to Quake mono samples
+    int samplePos = (int)(playedBytes / bytesPerSample);
+    return samplePos % dma.samples;
 }
 
+/*
+===============================================================================
+SNDDMA_Submit
+===============================================================================
+*/
 extern "C" void SNDDMA_Submit(void)
 {
     if (!s_soundInitialised)
         return;
 
-    CKernel *pKernel = CKernel::Get();
-    if (!pKernel)
-        return;
-
-    CSoundBaseDevice *pSound = pKernel->GetSoundDevice();
+    CSoundBaseDevice *pSound = CKernel::Get()->GetSoundDevice();
     if (!pSound || !pSound->IsActive())
         return;
 
-    s16 *samples = (s16 *) dma.buffer;
+    // Get total buffer capacity IN BYTES
+    size_t bufferSizeBytes = dma.samples * (dma.samplebits / 8);
 
-    SndUpdateDMAPos(pSound);
+    // Get a readable span of the ring buffer starting from s_dmaPos
+    Span s = ringReadableSpan(dma.buffer, bufferSizeBytes, s_dmaPos);
 
-    // Keep device queue near full by pushing data from dma.buffer in order.
-    unsigned queueSizeFrames = pSound->GetQueueSizeFrames();
-    unsigned queuedFrames = pSound->GetQueueFramesAvail();
-    if (queuedFrames >= queueSizeFrames)
+    // Attempt to send
+    int bytesWritten = pSound->Write(s.ptr, s.len);
+    if (bytesWritten <= 0)
         return;
 
-    unsigned freeFrames = queueSizeFrames - queuedFrames;
-
-    while (freeFrames > 0)
-    {
-        int startFrame = s_ringWrite / dma.channels;
-        int framesToWrap = dma.fullsamples - startFrame;
-        if (framesToWrap <= 0)
-            break;
-
-        unsigned writeFrames = freeFrames < (unsigned) framesToWrap
-            ? freeFrames
-            : (unsigned) framesToWrap;
-
-        unsigned bytes = writeFrames * (unsigned) dma.channels * sizeof(*samples);
-
-        int written = pSound->Write(
-            &samples[startFrame * dma.channels],
-            bytes);
-
-        if (written <= 0)
-            break;
-
-        // Only advance whole frames.
-        written -= written % (dma.channels * sizeof(short));
-
-        if (written == 0)
-            break;
-
-        int framesWritten = written / (dma.channels * (int) sizeof(short));
-        int monoSamples = framesWritten * dma.channels;
-
-        s_ringWrite = (s_ringWrite + monoSamples) % dma.samples;
-        s_framesSubmitted += (unsigned) framesWritten;
-
-        // Clear consumed region to keep startup and starvation behavior sane.
-        memset(&samples[startFrame * dma.channels], 0, (size_t) written);
-
-        freeFrames -= (unsigned) framesWritten;
-
-        // partial write: Circle FIFO is full
-        if ((unsigned)written < bytes)
-            break;
-    }
-
-    SndUpdateDMAPos(pSound);
+    // Position our DMA Pointer
+    s_dmaPos = (s_dmaPos + bytesWritten) % bufferSizeBytes;
 }
 
+/*
+===============================================================================
+SNDDMA_Shutdown
+===============================================================================
+*/
 extern "C" void SNDDMA_Shutdown(void)
 {
-    if (s_soundInitialised) {
-        CKernel *pKernel = CKernel::Get();
-        if (pKernel && pKernel->GetSoundDevice()) {
-            pKernel->GetSoundDevice()->Cancel();
-        }
-        
-        if (dma.buffer) {
-            free(dma.buffer);
-            dma.buffer = NULL;
-        }
-        s_ringWrite = 0;
-        s_dmaPos = 0;
-        s_framesSubmitted = 0;
-        s_soundInitialised = qfalse;
+    if (!s_soundInitialised)
+        return;
+
+    CSoundBaseDevice *pSound = CKernel::Get()->GetSoundDevice();
+    if (!pSound || !pSound->IsActive())
+        return;
+
+    pSound->Cancel();
+    // Wait for DMA to finish current transfer (with timeout)
+    unsigned timeout_ms = 0;
+    while (pSound->IsActive() && timeout_ms < 500) {
+        CTimer::Get()->MsDelay(5);
+        timeout_ms += 5;
     }
+
+    if (dma.buffer) {
+        free(dma.buffer);
+        dma.buffer = NULL;
+    }
+
+    s_soundInitialised = FALSE;
 }
 
 extern "C" void SNDDMA_BeginPainting(void)

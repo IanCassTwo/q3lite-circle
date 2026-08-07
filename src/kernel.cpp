@@ -213,11 +213,8 @@ boolean CKernel::Initialize (void)
 	if (bOK)
 	{
 		//m_pHDMISound = new CHDMISoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
-		m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationHDMI);
+		m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationAuto);
 		//m_pHDMISound = new CPWMSoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
-		m_pHDMISound->SetWriteFormat(SoundFormatSigned16, 2);
-	    	if (!m_pHDMISound->AllocateQueue(100))
-			LOGNOTE("Could not allocate the sound queue");
 
 	    	LOGNOTE("Initialized HDMI Sound");
 	}
@@ -254,7 +251,7 @@ TShutdownMode CKernel::Run (void)
 	// Search for USB devices
 	boolean bUpdated = m_USBHCI.UpdatePlugAndPlay ();
 
-	// Register the keyboard callbacks
+	// Register the USB keyboard callbacks
 	if (bUpdated && m_pKeyboard == 0) {
 		m_pKeyboard = (CUSBKeyboardDevice *) m_DeviceNameService.GetDevice ("ukbd1", FALSE);
 		if (m_pKeyboard != 0) {
@@ -266,7 +263,7 @@ TShutdownMode CKernel::Run (void)
 		}
 	}
 
-	// Register the mouse callbacks
+	// Register the USB mouse callbacks
 	if (bUpdated && m_pMouse == 0) {
 		m_pMouse = (CMouseDevice *) m_DeviceNameService.GetDevice ("mouse1", FALSE);
 		if (m_pMouse != 0) {
@@ -277,10 +274,6 @@ TShutdownMode CKernel::Run (void)
 			LOGNOTE("Mouse not found");
 		}
 	}
-
-	// Start the sound driver
-	if (!m_pHDMISound->Start()) 
-		LOGNOTE("Could not start the sound device!");
 
 	// Run Quake
 	_main ();

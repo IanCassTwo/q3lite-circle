@@ -70,14 +70,14 @@ Q3LITE_CORE_SRCS     = $(Q3_SRC)/qcommon/q_shared.c \
                        $(Q3_SRC)/client/cl_scrn.c \
                        $(Q3_SRC)/client/cl_ui.c \
                        $(Q3_SRC)/client/con_log.c \
-                       $(Q3_SRC)/client/snd_main.c \
-                       $(Q3_SRC)/client/snd_codec.c \
+                       $(Q3_SRC)/client/snd_adpcm.c \
                        $(Q3_SRC)/client/snd_codec_wav.c \
+                       $(Q3_SRC)/client/snd_codec.c \
+                       $(Q3_SRC)/client/snd_dma.c \
+                       $(Q3_SRC)/client/snd_main.c \
                        $(Q3_SRC)/client/snd_mem.c \
                        $(Q3_SRC)/client/snd_mix.c \
-                       $(Q3_SRC)/client/snd_adpcm.c \
-                       $(Q3_SRC)/client/snd_wavelet.c \
-                       $(Q3_SRC)/client/snd_dma.c
+                       $(Q3_SRC)/client/snd_wavelet.c 
 
 # Combine all source lists
 ALL_C_SRCS   = stubs.c $(Q3LITE_CORE_SRCS) $(Q3LITE_CIRCLE_SRCS) \
