@@ -622,7 +622,6 @@ void VM_Compile(vm_t *vm, vmHeader_t *header)
 	int i_count, pc = 0;
 	int pass;
 	int codeoffsets[2]; // was 1024 but it's only used for OFF_CODE and OFF_IMMEDIATES
-	static qboolean warned_circle_jit = qfalse;
 
 #define j_rel(x) (pass?_j_rel(x, pc):0xBAD)
 #define OFFSET(i) (pass?(j_rel(codeoffsets[i]-vm->codeLength)):(0xF000000F))

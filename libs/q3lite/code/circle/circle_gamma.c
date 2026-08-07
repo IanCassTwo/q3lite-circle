@@ -37,5 +37,11 @@ GLimp_SetGamma
 */
 void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] )
 {
+    // VideoCore ES 1.1 doesn't have glColorTable or hardware GL ramps.
+    // If glConfig.deviceSupportsGamma is qtrue, Quake 3 uses these 
+    // ramps to recalculate its internal lightmap & texture palettes.
+    
+    // NOP is sufficient here if glConfig.deviceSupportsGamma = qtrue,
+    // because Quake 3 falls back to applying gamma curves to lightmap texture pixels directly!
 }
 

@@ -78,10 +78,10 @@ void CQuakeKernel::Run(void)
     {
         Com_Frame();
 
-        // Let other tasks have CPU
-        if (CScheduler::Get()) {
-            CScheduler::Get()->Yield();
-        }
+    //    // Let other tasks have CPU
+    //    if (CScheduler::Get()) {
+    //        CScheduler::Get()->Yield();
+    //    }
     }
 }
 

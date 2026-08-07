@@ -212,8 +212,8 @@ boolean CKernel::Initialize (void)
 
 	if (bOK)
 	{
-		//m_pHDMISound = new CHDMISoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
-		m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationAuto);
+		m_pHDMISound = new CHDMISoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
+		//m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationAuto);
 		//m_pHDMISound = new CPWMSoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
 
 	    	LOGNOTE("Initialized HDMI Sound");

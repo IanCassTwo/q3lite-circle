@@ -109,7 +109,7 @@ CFLAGS += -I. \
           -DDLL_EXT=\".so\" -DQ3_LITTLE_ENDIAN -DUSE_GLES -DQGL_DIRECT \
           -mno-unaligned-access -DBOTLIB \
           -D_SYS__PTHREADTYPES_H_ \
-	  -DSTANDALONE \
+	  -DCIRCLE_VM_JIT_EXPERIMENTAL \
           -I$(Q3_SRC)/qcommon \
           -I$(Q3_SRC)/client \
           -I$(Q3_SRC)/server \

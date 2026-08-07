@@ -214,6 +214,7 @@ void GLimp_Init( qboolean fixedFunction )
         EGL_BLUE_SIZE, 8,
         EGL_ALPHA_SIZE, 8,
         EGL_DEPTH_SIZE, 16,
+        EGL_STENCIL_SIZE, 8,
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
         EGL_NONE
@@ -325,12 +326,12 @@ void GLimp_Init( qboolean fixedFunction )
     glConfig.vidHeight = gl_state.screen_height;
     glConfig.windowAspect = (float)glConfig.vidWidth / (float)glConfig.vidHeight;
     glConfig.colorBits = 32;
-    glConfig.depthBits = 16;
-    glConfig.stencilBits = 0;
+    glConfig.depthBits = 24;
+    glConfig.stencilBits = 8;
     glConfig.isFullscreen = qtrue;
     glConfig.driverType = GLDRV_ICD;
     glConfig.hardwareType = GLHW_GENERIC;
-    glConfig.deviceSupportsGamma = qfalse;
+    glConfig.deviceSupportsGamma = qtrue;
 
     // Retrieve Driver Strings
     Q_strncpyz( glConfig.vendor_string, (char *) qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
@@ -370,6 +371,10 @@ void GLimp_EndFrame( void )
         {
             ri.Printf(PRINT_ALL, "[VIDEO] GL ERROR before swap = 0x%X\n", err);
         }
+
+        // Tell VideoCore IV to discard Depth & Stencil buffers before swap so it doesn't write them to RAM
+        const GLenum attachments[] = { GL_DEPTH_EXT, GL_STENCIL_EXT };
+        glDiscardFramebufferEXT( GL_FRAMEBUFFER_OES, 2, attachments );
 
         EGLBoolean res = eglSwapBuffers( gl_state.display, gl_state.surface );
         if ( res == EGL_FALSE )

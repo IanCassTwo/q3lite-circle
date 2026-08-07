@@ -64,6 +64,7 @@ static char steamPath[ MAX_OSPATH ] = { 0 };
 // Used to store the GOG Quake 3 installation path
 static char gogPath[ MAX_OSPATH ] = { 0 };
 
+/*
 static const char *timestamp(void)
 {
     time_t t = time(NULL);
@@ -78,6 +79,15 @@ static const char *timestamp(void)
         }
     }
     return retval ? retval : "[date unknown]";
+}
+*/
+
+static const char *timestamp(void)
+{
+    static char buf[32];
+    unsigned long seconds = (unsigned long)(CTimer::GetClockTicks64() / 1000000);
+    Com_sprintf(buf, sizeof(buf), "Uptime: %lu s", seconds);
+    return buf;
 }
 
 /*
@@ -252,7 +262,13 @@ FILE *Sys_FOpen( const char *ospath, const char *mode ) {
 	if ( !stat( ospath, &buf ) && S_ISDIR( buf.st_mode ) )
 		return NULL;
 
-	return fopen( ospath, mode );
+	FILE *f = fopen( ospath, mode );
+	if ( f && (mode[0] == 'r' || mode[0] == 'b') ) {
+		// Set a 64KB read buffer for SD card block streaming
+		setvbuf( f, NULL, _IOFBF, 64 * 1024 );
+	}
+	return f;
+
 }
 
 /*
@@ -357,29 +373,40 @@ void Sys_ListFilteredFiles( const char *basedir, char *subdirs, char *filter, ch
 	}
 
 	while ((d = readdir(fdir)) != NULL) {
-		Com_sprintf(filename, sizeof(filename), "%s/%s", search, d->d_name);
-		if (stat(filename, &st) == -1)
+		if (!Q_stricmp(d->d_name, ".") || !Q_stricmp(d->d_name, ".."))
 			continue;
 
-		if (st.st_mode & S_IFDIR) {
-			if (Q_stricmp(d->d_name, ".") && Q_stricmp(d->d_name, "..")) {
-				if (strlen(subdirs)) {
-					Com_sprintf( newsubdirs, sizeof(newsubdirs), "%s/%s", subdirs, d->d_name);
-				}
-				else {
-					Com_sprintf( newsubdirs, sizeof(newsubdirs), "%s", d->d_name);
-				}
-				Sys_ListFilteredFiles( basedir, newsubdirs, filter, list, numfiles );
+		bool isDir = false;
+	#ifdef DT_DIR
+		if (d->d_type == DT_DIR) {
+			isDir = true;
+		} else if (d->d_type == DT_UNKNOWN) {
+	#endif
+			Com_sprintf(filename, sizeof(filename), "%s/%s", search, d->d_name);
+			if (stat(filename, &st) == 0 && (st.st_mode & S_IFDIR)) {
+				isDir = true;
+			}
+	#ifdef DT_DIR
+		}
+	#endif
+
+		if (isDir) {
+			if (strlen(subdirs)) {
+				Com_sprintf(newsubdirs, sizeof(newsubdirs), "%s/%s", subdirs, d->d_name);
+			} else {
+				Com_sprintf(newsubdirs, sizeof(newsubdirs), "%s", d->d_name);
+			}
+			Sys_ListFilteredFiles(basedir, newsubdirs, filter, list, numfiles);
+		} else {
+			if (*numfiles >= MAX_FOUND_FILES - 1)
+				break;
+
+			Com_sprintf(filename, sizeof(filename), "%s/%s", subdirs, d->d_name);
+			if (Com_FilterPath(filter, filename, qfalse)) {
+				list[*numfiles] = CopyString(filename);
+				(*numfiles)++;
 			}
 		}
-		if ( *numfiles >= MAX_FOUND_FILES - 1 ) {
-			break;
-		}
-		Com_sprintf( filename, sizeof(filename), "%s/%s", subdirs, d->d_name );
-		if (!Com_FilterPath( filter, filename, qfalse ))
-			continue;
-		list[ *numfiles ] = CopyString( filename );
-		(*numfiles)++;
 	}
 
 	closedir(fdir);
@@ -514,6 +541,15 @@ Block execution for msec or until input is received.
 */
 void Sys_Sleep( int msec )
 {
+	if ( msec < 0 )
+        return;
+
+    if ( msec == 0 )
+    {
+        CScheduler::Get()->Yield();
+        return;
+    }
+
 	CScheduler::Get ()->MsSleep (msec);
 }
 
@@ -734,6 +770,14 @@ void Sys_SetFloatEnv(void)
 {
 	// rounding toward nearest
 	fesetround(FE_TONEAREST);
+
+#if defined(__arm__) || defined(__aarch64__)
+    // Enable Flush-to-Zero (FTZ) mode on ARM VFP/NEON to prevent subnormal traps
+    uint32_t fpscr;
+    __asm__ volatile("mrc p10, 7, %0, cr1, cr0, 0" : "=r"(fpscr));
+    fpscr |= (1 << 24); // Set FTZ bit
+    __asm__ volatile("mcr p10, 7, %0, cr1, cr0, 0" :: "r"(fpscr));
+#endif
 }
 
 /*

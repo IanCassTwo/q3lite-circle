@@ -151,6 +151,10 @@ extern "C" void SNDDMA_Submit(void)
 
     // Position our DMA Pointer
     s_dmaPos = (s_dmaPos + bytesWritten) % bufferSizeBytes;
+
+    //if (CScheduler::Get()) {
+    //    CScheduler::Get()->Yield();
+    //}
 }
 
 /*
