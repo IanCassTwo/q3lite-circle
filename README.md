@@ -96,7 +96,6 @@ The resulting image is copied to a Raspberry Pi boot medium and launched directl
 ## Roadmap
 TODO list includes:
 
-* [ ] Audio support
 * [ ] Improved hardware compatibility testing
 * [ ] Performance tuning including multi-core
 * [ ] Networking
