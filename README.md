@@ -9,12 +9,11 @@ This project combines the Quake III Arena lightweight engine (q3lite) with the b
 
 The project currently:
 
-* ✅ Builds successfully
 * ✅ Boots and runs on Raspberry Pi hardware
 * ✅ Produces graphical output
-* ✅ Keyboard input not yet implemented
-* ✅ Mouse input not yet implemented
-* ✅ Sound output not yet implemented (partially, not finished
+* ✅ Keyboard input working
+* ✅ Mouse input working
+* ✅ Sound output working
 * ✅ JIT Compiler for QVM (working with caveats)
 * ❌ Networking
 
