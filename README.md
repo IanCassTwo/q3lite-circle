@@ -100,6 +100,14 @@ TODO list includes:
 * [ ] Performance tuning including multi-core
 * [ ] Networking
 
+## QVM JIT
+The QVM JIT compiler requires dynamic memory execution. Because Circle does not implement POSIX `mmap()` or `mprotect()`, heap memory is marked as Execute-Never (`XN`) by default, preventing execution of dynamically emitted native ARM code.
+
+To enable the JIT compiler, complete the following two steps:
+
+1) **Enable Executable Heap Memory in Circle:** Find pagetable.cpp inside Circle under the circle-stdlib source rree. Change the nAttributes from ARMV6MMUL1SECTION_NORMAL_XN to ARMV6MMUL1SECTION_NORMAL. Note on Security: Disabling the XN bit globally allows code to be executed directly from RAM heap sections. This will remove hardware-level execution protection against stack/heap buffer overflows. It's up to you to evaluate the risk.
+2) **Enable the JIT Build Flag** Add -DCIRCLE_VM_JIT_EXPERIMENTAL to your CFLAGS in your Makefile 
+
 ## Background
 This project is an experiment in combining modern embedded hardware with classic PC-era game technology. Running q3lite on bare metal provides an interesting challenge: recreating the services normally provided by an operating system while keeping the simplicity and efficiency of direct hardware execution.
 
