@@ -144,8 +144,6 @@ Handles path normalization, missing-file checks, and .pk3 RAM-caching.
 FILE *__wrap_fopen( const char *path, const char *mode ) {
     if ( !path ) return NULL;
 
-    Com_Printf("__wrap_fopen: %s (mode: %s)\n", path, mode);
-
     // Sanitize leading double slashes (e.g. "//baseq3/pak0.pk3" -> "/baseq3/pak0.pk3")
     const char *clean_path = path;
     while ( clean_path[0] == '/' && clean_path[1] == '/' ) {
@@ -158,8 +156,6 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
         return NULL;
     }
 
-    Com_Printf("__wrap_fopen: Disk file opened: %s\n", clean_path);
-
     // Intercept read operations for .pk3 archives
     if ( ( mode[0] == 'r' || mode[0] == 'b' ) && IsPK3File( clean_path ) ) {
         std::string key( clean_path );
@@ -168,7 +164,6 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
         auto it = g_ramCache.find( key );
         if ( it != g_ramCache.end() ) {
             __real_fclose( disk_f );
-            Com_Printf("RAM CACHE HIT: %s\n", clean_path);
             RamCookie *rc = new RamCookie{ it->second.data, it->second.size, 0 };
             return fopencookie( rc, "rb", ram_funcs );
         }
@@ -176,18 +171,21 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
         // Cache MISS: Load .pk3 file contents into RAM
         fseek( disk_f, 0, SEEK_END );
         long file_size = ftell( disk_f );
+        
+        // Always reset file pointer to the beginning before attempting allocation/reads
         fseek( disk_f, 0, SEEK_SET );
 
         if ( file_size > 0 ) {
-            Com_Printf("RAM CACHE LOADING: %s (%ld bytes)\n", clean_path, file_size);
             char *cached_data = (char *)malloc( file_size );
             if ( cached_data ) {
-                // 1. Expand the stream's internal buffer to 1MB to maximize SD card burst speed
+
+                // Expand the stream's internal buffer to 1MB to maximize SD card burst speed
                 setvbuf( disk_f, NULL, _IOFBF, 1024 * 1024 );
 
-                // 2. Read in large 1MB blocks to prevent C-library / FAT overhead
+                // Read in large blocks to prevent C-library / FAT overhead
                 constexpr size_t BLOCK_SIZE = 1024 * 1024; // 1MB block size
                 size_t total_bytes_read = 0;
+                bool read_error = false;
 
                 while ( total_bytes_read < (size_t)file_size ) {
                     size_t bytes_to_read = BLOCK_SIZE;
@@ -200,27 +198,28 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
 
                     // Handle early EOF or disk read errors
                     if ( read_count == 0 && ferror( disk_f ) ) {
-                        Com_Printf("RAM CACHE READ ERROR: %s\n", clean_path);
+                        read_error = true;
                         break;
                     }
                 }
 
-                __real_fclose( disk_f );
+                if ( !read_error && total_bytes_read == (size_t)file_size ) {
+                    __real_fclose( disk_f );
 
-                g_ramCache[key] = CachedFile{ cached_data, (size_t)file_size };
+                    g_ramCache[key] = CachedFile{ cached_data, (size_t)file_size };
 
-                RamCookie *rc = new RamCookie{ cached_data, (size_t)file_size, 0 };
-                Com_Printf("RAM CACHE CREATED: %s (%ld bytes)\n", clean_path, file_size);
-                return fopencookie( rc, "rb", ram_funcs );
-            } else {
-                Com_Printf("RAM CACHE MALLOC FAILED: %s\n", clean_path);
+                    RamCookie *rc = new RamCookie{ cached_data, (size_t)file_size, 0 };
+                    return fopencookie( rc, "rb", ram_funcs );
+                }
+
+                // If read failed, clean up allocated buffer and fall back to disk stream
+                free( cached_data );
                 fseek( disk_f, 0, SEEK_SET );
             }
         }
     }
 
-    Com_Printf("__wrap_fopen: Regular file handle returned: %s\n", clean_path);
-    // Default stream buffer for non-PK3 disk handles
+    // Default stream buffer for non-PK3 disk handles or un-cached PK3 fallbacks
     if ( mode[0] == 'r' || mode[0] == 'b' ) {
         setvbuf( disk_f, NULL, _IOFBF, 64 * 1024 );
     }
@@ -234,7 +233,6 @@ __wrap_fclose
 Ensures close calls map cleanly to real fclose.
 */
 int __wrap_fclose( FILE *fp ) {
-	Com_Printf("Sys_FClose: %p\n", fp);
     if ( !fp ) return 0;
     return __real_fclose( fp );
 }
@@ -377,8 +375,6 @@ char *Sys_GetCurrentUser( void )
 	return "player";
 }
 
-#define MEM_THRESHOLD 96*1024*1024
-
 /*
 ==================
 Sys_LowPhysicalMemory
@@ -386,6 +382,7 @@ Sys_LowPhysicalMemory
 */
 qboolean Sys_LowPhysicalMemory( void )
 {
+	// No Raspberry Pi has low memory, so we can safely return false here.
 	return qfalse;
 }
 
@@ -424,6 +421,9 @@ Sys_FOpen
 Simple pass-through wrapper to fopen.
 */
 FILE *Sys_FOpen( const char *ospath, const char *mode ) {
+	// Seems Quake3 doesn't always call this method to open files, 
+	// so we just pass through to fopen() directly and implement our
+	// ram caching in __wrap_fopen() instead.
     return fopen( ospath, mode );
 }
 
@@ -829,8 +829,11 @@ void Sys_GLimpInit( void ) {}
 
 void Sys_SetFloatEnv(void)
 {
+	// Ensure floating point operations use round-to-nearest mode
 	fesetround(FE_TONEAREST);
 
+	// Enable flush-to-zero and denormals-are-zero for ARM architectures so 
+	// that denormalized floating point numbers don't cause performance issues.
 #if defined(__arm__) || defined(__aarch64__)
     uint32_t fpscr;
     __asm__ volatile("mrc p10, 7, %0, cr1, cr0, 0" : "=r"(fpscr));
