@@ -636,6 +636,7 @@ void VM_Compile(vm_t *vm, vmHeader_t *header)
 #ifdef __CIRCLE__
 #ifndef CIRCLE_VM_JIT_EXPERIMENTAL
 	/* Circle currently maps heap pages non-executable, so JIT code faults with prefetch abort. */
+	static qboolean warned_circle_jit = qfalse;
 	if (!warned_circle_jit) {
 		Com_Printf("ARM JIT disabled on Circle (non-executable heap); using VM interpreter\n");
 		warned_circle_jit = qtrue;

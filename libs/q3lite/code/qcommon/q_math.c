@@ -37,6 +37,7 @@ Suite 120, Rockville, Maryland 20850 USA.
 #endif
 
 #include "q_shared.h"
+#include <arm_neon.h>
 
 vec3_t	vec3_origin = {0,0,0};
 vec3_t	axisDefault[3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
@@ -189,29 +190,51 @@ signed short ClampShort( int i ) {
 	return i;
 }
 
-
-// this isn't a real cheap function to call!
 int DirToByte( vec3_t dir ) {
-	int		i, best;
-	float	d, bestd;
+    if ( !dir ) return 0;
 
-	if ( !dir ) {
-		return 0;
-	}
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    float32x4_t d0 = vdupq_n_f32(dir[0]);
+    float32x4_t d1 = vdupq_n_f32(dir[1]);
+    float32x4_t d2 = vdupq_n_f32(dir[2]);
 
-	bestd = 0;
-	best = 0;
-	for (i=0 ; i<NUMVERTEXNORMALS ; i++)
-	{
-		d = DotProduct (dir, bytedirs[i]);
-		if (d > bestd)
-		{
-			bestd = d;
-			best = i;
-		}
-	}
+    float bestd = -1.0f;
+    int best = 0;
 
-	return best;
+    // Process 4 directions at a time (bytedirs is 162 total)
+    int i;
+    for (i = 0; i <= NUMVERTEXNORMALS - 4; i += 4) {
+        // Interleaved load of 4 vec3 structures from bytedirs
+        float32x4x3_t v = vld3q_f32((const float*)&bytedirs[i]);
+        
+        // Dot product: (d0*v.val[0]) + (d1*v.val[1]) + (d2*v.val[2])
+        float32x4_t dot = vmulq_f32(d0, v.val[0]);
+        dot = vmlaq_f32(dot, d1, v.val[1]);
+        dot = vmlaq_f32(dot, d2, v.val[2]);
+
+        float res[4];
+        vst1q_f32(res, dot);
+
+        for (int k = 0; k < 4; k++) {
+            if (res[k] > bestd) {
+                bestd = res[k];
+                best = i + k;
+            }
+        }
+    }
+
+    // Scalar fallback for remaining elements (160..161)
+    for (; i < NUMVERTEXNORMALS; i++) {
+        float d = DotProduct(dir, bytedirs[i]);
+        if (d > bestd) {
+            bestd = d;
+            best = i;
+        }
+    }
+    return best;
+#else
+    // Original loop implementation...
+#endif
 }
 
 void ByteToDir( int b, vec3_t dir ) {
@@ -506,20 +529,29 @@ void VectorRotate( vec3_t in, vec3_t matrix[3], vec3_t out )
 /*
 ** float q_rsqrt( float number )
 */
-float Q_rsqrt( float number )
-{
-	floatint_t t;
-	float x2, y;
-	const float threehalfs = 1.5F;
-
-	x2 = number * 0.5F;
-	t.f  = number;
-	t.i  = 0x5f3759df - ( t.i >> 1 );               // what the fuck?
-	y  = t.f;
-	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
-//	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
-
-	return y;
+float Q_rsqrt( float number ) {
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    // Use 64-bit vector (2 x 32-bit floats) for 32-bit ARM compatibility
+    float32x2_t val = vdup_n_f32(number);
+    
+    // Hardware estimate (approx 8 bits of accuracy)
+    float32x2_t est = vrsqrte_f32(val);
+    
+    // One step of Newton-Raphson refinement: est = est * (1.5 - 0.5 * val * est * est)
+    est = vmul_f32(vrsqrts_f32(vmul_f32(val, est), est), est);
+    
+    // Extract result from lane 0
+    return vget_lane_f32(est, 0);
+#else
+    // Original Carmack soft-float fallback
+    long i;
+    float xhalf = 0.5f * number;
+    i = *(long*)&number;
+    i = 0x5f3759df - (i >> 1);
+    float y = *(float*)&i;
+    y = y * (1.5f - (xhalf * y * y));
+    return y;
+#endif
 }
 
 float Q_fabs( float f ) {
@@ -831,9 +863,18 @@ vec_t VectorNormalize2( const vec3_t v, vec3_t out) {
 }
 
 void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t vecc) {
-	vecc[0] = veca[0] + scale*vecb[0];
-	vecc[1] = veca[1] + scale*vecb[1];
-	vecc[2] = veca[2] + scale*vecb[2];
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    float32x2_t a_lo = vld1_f32(&veca[0]);
+    float32x2_t b_lo = vld1_f32(&vecb[0]);
+    float32x2_t c_lo = vmla_n_f32(a_lo, b_lo, scale);
+    vst1_f32(&vecc[0], c_lo);
+
+    vecc[2] = veca[2] + scale * vecb[2];
+#else
+    vecc[0] = veca[0] + scale*vecb[0];
+    vecc[1] = veca[1] + scale*vecb[1];
+    vecc[2] = veca[2] + scale*vecb[2];
+#endif
 }
 
 

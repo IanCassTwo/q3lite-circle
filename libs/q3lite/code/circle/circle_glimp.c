@@ -213,12 +213,27 @@ void GLimp_Init( qboolean fixedFunction )
         EGL_GREEN_SIZE, 8,
         EGL_BLUE_SIZE, 8,
         EGL_ALPHA_SIZE, 8,
-        EGL_DEPTH_SIZE, 16,
+        EGL_DEPTH_SIZE, 24,
         EGL_STENCIL_SIZE, 8,
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
         EGL_NONE
     };
+
+/*
+    static const EGLint attribute_list[] =
+{
+    EGL_RED_SIZE, 5,
+    EGL_GREEN_SIZE, 6,
+    EGL_BLUE_SIZE, 5,
+    EGL_ALPHA_SIZE, 0,    
+    EGL_DEPTH_SIZE, 16,   
+    EGL_STENCIL_SIZE, 0,  
+    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
+    EGL_NONE
+};
+*/
 
     static const EGLint context_attributes[] =
     {
@@ -260,16 +275,49 @@ void GLimp_Init( qboolean fixedFunction )
         ri.Error( ERR_FATAL, "GLimp_Init() - eglCreateContext failed (0x%lx)", (long)eglGetError() );
     }
 
-    // Setup Native VideoCore Dispmanx Window
-    success = graphics_get_display_size( 0 /* LCD/HDMI */, &gl_state.screen_width, &gl_state.screen_height );
+    // -------------------------------------------------------------------
+    // RESOLUTION HANDLING: Match Quake 3's r_mode
+    // -------------------------------------------------------------------
+    uint32_t native_display_width, native_display_height;
+    success = graphics_get_display_size( 0 /* LCD/HDMI */, &native_display_width, &native_display_height );
     if ( success < 0 )
     {
         ri.Error( ERR_FATAL, "GLimp_Init() - graphics_get_display_size failed (%ld)", (long)success );
     }
-    ri.Printf( PRINT_ALL, "[VIDEO] Dispmanx resolution: %ldx%ld\n", (long)gl_state.screen_width, (long)gl_state.screen_height );
 
-    // Set rectangles explicitly using VideoCore rect utilities
-    vc_dispmanx_rect_set( &dst_rect, 0, 0, gl_state.screen_width, gl_state.screen_height );
+    // Map r_mode integer to resolution dimensions
+    int mode = ri.Cvar_VariableIntegerValue( "r_mode" );
+    switch ( mode )
+    {
+        case 0:  gl_state.screen_width = 320;  gl_state.screen_height = 240;  break;
+        case 1:  gl_state.screen_width = 400;  gl_state.screen_height = 300;  break;
+        case 2:  gl_state.screen_width = 512;  gl_state.screen_height = 384;  break;
+        case 3:  gl_state.screen_width = 640;  gl_state.screen_height = 480;  break;
+        case 4:  gl_state.screen_width = 800;  gl_state.screen_height = 600;  break;
+        case 5:  gl_state.screen_width = 960;  gl_state.screen_height = 720;  break;
+        case 6:  gl_state.screen_width = 1024; gl_state.screen_height = 768;  break;
+        case 7:  gl_state.screen_width = 1152; gl_state.screen_height = 864;  break;
+        case 8:  gl_state.screen_width = 1280; gl_state.screen_height = 1024; break;
+        case -1: // Custom Mode
+            gl_state.screen_width  = ri.Cvar_VariableIntegerValue( "r_customwidth" );
+            gl_state.screen_height = ri.Cvar_VariableIntegerValue( "r_customheight" );
+            if ( gl_state.screen_width <= 0 )  gl_state.screen_width = 800;
+            if ( gl_state.screen_height <= 0 ) gl_state.screen_height = 600;
+            break;
+        default: // Default fallback (r_mode 4 or -2/native fallback)
+            gl_state.screen_width = 800;
+            gl_state.screen_height = 600;
+            break;
+    }
+
+    ri.Printf( PRINT_ALL, "[VIDEO] Display: %ldx%ld Native -> %ldx%ld Q3 Render Buffer\n", 
+               (long)native_display_width, (long)native_display_height, 
+               (long)gl_state.screen_width, (long)gl_state.screen_height );
+
+    // Destination rect fills the native HDMI display monitor
+    vc_dispmanx_rect_set( &dst_rect, 0, 0, native_display_width, native_display_height );
+    
+    // Source rect represents the GLES framebuffer (fixed-point 16.16 shift format required by VideoCore)
     vc_dispmanx_rect_set( &src_rect, 0, 0, gl_state.screen_width << 16, gl_state.screen_height << 16 );
 
     gl_state.dispman_display = vc_dispmanx_display_open( 0 );
@@ -309,6 +357,9 @@ void GLimp_Init( qboolean fixedFunction )
     {
         ri.Error( ERR_FATAL, "GLimp_Init() - eglMakeCurrent failed (0x%lx)", (long)eglGetError() );
     }
+
+    // Disable VSync synchronization delays if desired
+    eglSwapInterval( gl_state.display, 0 );
 
     // Bind QGL Pointers using Q3lite's macro tables
 #define GLE(ret, name, ...) qgl##name = gl##name;
@@ -366,15 +417,18 @@ void GLimp_EndFrame( void )
 
     if ( gl_state.display != EGL_NO_DISPLAY && gl_state.surface != EGL_NO_SURFACE )
     {
+        // GL_DEPTH_EXT / GL_STENCIL_EXT are the required enums for the default window framebuffer
+        const GLenum attachments[] = { GL_DEPTH_EXT, GL_STENCIL_EXT };
+        glDiscardFramebufferEXT( GL_FRAMEBUFFER_OES, 2, attachments );
+        //const GLenum attachments[] = { GL_DEPTH_EXT };
+        //glDiscardFramebufferEXT( GL_FRAMEBUFFER_OES, 1, attachments );
+
+        // Check for GL errors AFTER discard runs
         GLenum err = qglGetError();
         if (err != GL_NO_ERROR)
         {
             ri.Printf(PRINT_ALL, "[VIDEO] GL ERROR before swap = 0x%X\n", err);
         }
-
-        // Tell VideoCore IV to discard Depth & Stencil buffers before swap so it doesn't write them to RAM
-        const GLenum attachments[] = { GL_DEPTH_EXT, GL_STENCIL_EXT };
-        glDiscardFramebufferEXT( GL_FRAMEBUFFER_OES, 2, attachments );
 
         EGLBoolean res = eglSwapBuffers( gl_state.display, gl_state.surface );
         if ( res == EGL_FALSE )

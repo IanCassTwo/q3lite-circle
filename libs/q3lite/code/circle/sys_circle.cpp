@@ -201,6 +201,9 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
                         read_error = true;
                         break;
                     }
+					if ( total_bytes_read % (10 * BLOCK_SIZE) < BLOCK_SIZE ) {
+							CScheduler::Get()->Yield();
+					}
                 }
 
                 if ( !read_error && total_bytes_read == (size_t)file_size ) {
@@ -697,7 +700,7 @@ void Sys_Sleep( int msec )
 
     if ( msec == 0 )
     {
-        CScheduler::Get()->Yield();
+        //CScheduler::Get()->Yield();
         return;
     }
 

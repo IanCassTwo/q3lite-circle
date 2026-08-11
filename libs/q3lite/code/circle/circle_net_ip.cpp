@@ -174,11 +174,30 @@ qboolean NET_IsLocalAddress( netadr_t adr ) {
 }
 
 /*
+====================
+NET_CheckDeferredInit
+====================
+*/
+static void NET_CheckDeferredInit( void ) {
+    // If networking is enabled but socket isn't opened yet, retry
+    if (!g_pUDPSocket) {
+        if (g_pNetSubsystem && g_pNetSubsystem->IsRunning()) {
+            const CIPAddress *pIP = g_pNetSubsystem->GetConfig()->GetIPAddress();
+            if (pIP && pIP->IsSet()) {
+                Com_Printf("Network connected! Initializing network socket...\n");
+                NET_Restart_f();
+            }
+        }
+    }
+}
+
+/*
 ==================
 NET_GetPacket
 ==================
 */
 qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, void *unused ) {
+
     if (!g_pUDPSocket) {
         return qfalse;
     }
@@ -186,8 +205,7 @@ qboolean NET_GetPacket( netadr_t *net_from, msg_t *net_message, void *unused ) {
     CIPAddress fromIP;
     u16 fromPort = 0;
     
-    int ret = g_pUDPSocket->ReceiveFrom(net_message->data, net_message->maxsize, 0, &fromIP, &fromPort);
-
+    int ret = g_pUDPSocket->ReceiveFrom(net_message->data, net_message->maxsize, MSG_DONTWAIT, &fromIP, &fromPort);
     if (ret <= 0) {
         return qfalse;
     }
@@ -213,6 +231,8 @@ Sys_SendPacket
 */
 void Sys_SendPacket( int length, const void *data, netadr_t to ) {
     if (!g_pUDPSocket) {
+        Com_Printf("Sys_SendPacket: UDP socket not initialized, restarting\n");
+        NET_Restart_f();
         return;
     }
 
@@ -273,6 +293,8 @@ void Sys_ShowIP(void) {
     }
 }
 
+
+
 /*
 ====================
 NET_OpenIP
@@ -281,7 +303,7 @@ NET_OpenIP
 void NET_OpenIP( void ) {
 
     if (!g_pNetSubsystem || !g_pNetSubsystem->IsRunning()) {
-        Com_Printf("WARNING: Circle Network Subsystem is not running.\n");
+        Com_Printf("WARNING: Network is not yet available.\n");
         return;
     }
 
@@ -293,15 +315,16 @@ void NET_OpenIP( void ) {
         return;
     }
 
-    if (!g_pUDPSocket->Bind(port)) {
+    if (g_pUDPSocket->Bind(port) < 0) {
         Com_Printf("WARNING: NET_OpenIP: Couldn't bind to port %i\n", port);
         delete g_pUDPSocket;
         g_pUDPSocket = nullptr;
         return;
     }
 
-    Com_Printf("Opening UDP socket on port %i\n", port);
-    Sys_ShowIP();
+    Com_Printf("Network is enabled");
+    //CScheduler::Get()->Yield();
+    //Sys_ShowIP();
 }
 
 /*
@@ -335,6 +358,13 @@ NET_Config
 ====================
 */
 void NET_Config( qboolean enableNetworking ) {
+
+    if (!g_pNetSubsystem || !g_pNetSubsystem->IsRunning()) {
+        Com_Printf("WARNING: Circle Network is not yet available.\n");
+        return;
+    }
+
+    Com_Printf("NET_Config: %s networking\n", enableNetworking ? "Enabling" : "Disabling");
     qboolean modified = NET_GetCvars();
 
     if (!net_enabled->integer) {
@@ -342,6 +372,7 @@ void NET_Config( qboolean enableNetworking ) {
     }
 
     if (enableNetworking == networkingEnabled && !modified) {
+        Com_Printf("NET_Config: No changes to networking state, returning.\n");
         return;
     }
 
@@ -363,6 +394,8 @@ NET_Restart_f
 ====================
 */
 void NET_Restart_f(void) {
+    Com_Printf("Restarting network subsystem...\n");
+    NET_Config(qfalse);
     NET_Config(qtrue);
 }
 
@@ -372,6 +405,7 @@ NET_Init
 ====================
 */
 void NET_Init( void ) {
+    Com_Printf("Initializing Circle Network Subsystem...\n");
     g_pNetSubsystem = CKernel::Get()->GetNetwork();
     NET_GetCvars();
     NET_Config( qtrue );
@@ -401,6 +435,8 @@ void NET_Event( void ) {
     netadr_t from;
     msg_t netmsg;
 
+    NET_CheckDeferredInit();
+
     while ( 1 ) {
         MSG_Init( &netmsg, bufData, MAX_MSGLEN );
 
@@ -426,8 +462,21 @@ NET_Sleep
 ====================
 */
 void NET_Sleep(int msec) {
+    if (msec < 0) {
+        return;
+    }
+
+    // Pump packets immediately before sleeping
     NET_Event();
-}
+
+    // If we are just yielding time, give Circle's scheduler a single slice
+    if (msec > 0) {
+        // Yield allows Circle's background tasks (Wi-Fi driver, network stack) to run
+        CScheduler::Get()->Yield(); 
+        
+        // Pump again in case Circle's network tasks queued a packet during the yield
+        NET_Event();
+    }}
 
 /*
 ====================
