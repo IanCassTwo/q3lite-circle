@@ -99,6 +99,7 @@ include $(CIRCLEHOME)/Rules.mk
 # -DCIRCLE_VM_JIT_EXPERIMENTAL \
 
 # Include Paths & CFLAGS (Added -DBOTLIB)
+# Add -DCIRCLE_VM_JIT_EXPERIMENTAL to enable JIT
 CFLAGS += -I. \
 	  -I"$(NEWLIBDIR)/include" \
 	  -I $(STDDEF_INCPATH) -I $(STDLIBHOME)/include -I $(CIRCLEHOME)/include \
@@ -110,7 +111,6 @@ CFLAGS += -I. \
           -DDLL_EXT=\".so\" -DQ3_LITTLE_ENDIAN -DUSE_GLES -DQGL_DIRECT \
           -mno-unaligned-access -DBOTLIB \
           -D_SYS__PTHREADTYPES_H_ \
-	  -DCIRCLE_VM_JIT_EXPERIMENTAL \
           -I$(Q3_SRC)/qcommon \
           -I$(Q3_SRC)/client \
           -I$(Q3_SRC)/server \
