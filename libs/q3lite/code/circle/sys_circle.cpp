@@ -37,11 +37,96 @@ Suite 120, Rockville, Maryland 20850 USA.
 #include <libgen.h>
 #include <fcntl.h>
 #include <fenv.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unordered_map>
+#include <string>
+#include <ctype.h>
 
 // Circle C++ headers MUST stay outside extern "C"
 #include <circle/bcmrandom.h>
 #include <circle/sched/scheduler.h>
 #include <circle/timer.h>
+
+// Declarations for GNU Linker Symbol Wrapping
+extern "C" {
+    FILE *__real_fopen( const char *path, const char *mode );
+    FILE *__wrap_fopen( const char *path, const char *mode );
+    int __real_fclose( FILE *fp );
+    int __wrap_fclose( FILE *fp );
+}
+
+// Simple in-memory file structure
+struct CachedFile {
+    char *data;
+    size_t size;
+};
+
+// Global cache table mapping path -> file buffer
+static std::unordered_map<std::string, CachedFile> g_ramCache;
+
+struct RamCookie {
+    const char *data;
+    size_t size;
+    size_t offset;
+};
+
+static ssize_t ram_read( void *cookie, char *buf, size_t size ) {
+    RamCookie *rc = (RamCookie *)cookie;
+    if ( rc->offset >= rc->size ) {
+        return 0; // EOF
+    }
+    size_t avail = rc->size - rc->offset;
+    size_t to_read = ( size < avail ) ? size : avail;
+    memcpy( buf, rc->data + rc->offset, to_read );
+    rc->offset += to_read;
+    return to_read;
+}
+
+static int ram_seek( void *cookie, off_t *offset, int whence ) {
+    RamCookie *rc = (RamCookie *)cookie;
+    off_t new_pos = rc->offset;
+
+    switch ( whence ) {
+        case SEEK_SET: new_pos = *offset; break;
+        case SEEK_CUR: new_pos += *offset; break;
+        case SEEK_END: new_pos = rc->size + *offset; break;
+        default: return -1;
+    }
+
+    if ( new_pos < 0 || new_pos > (off_t)rc->size ) {
+        return -1;
+    }
+
+    rc->offset = (size_t)new_pos;
+    *offset = new_pos;
+    return 0;
+}
+
+static int ram_close( void *cookie ) {
+    delete (RamCookie *)cookie;
+    return 0;
+}
+
+static cookie_io_functions_t ram_funcs = {
+    .read  = ram_read,
+    .write = NULL,
+    .seek  = ram_seek,
+    .close = ram_close
+};
+
+// Helper function to check if a file path ends in .pk3 (case-insensitive)
+static bool IsPK3File( const char *path ) {
+    if ( !path ) return false;
+    size_t len = strlen( path );
+    if ( len < 4 ) return false;
+
+    const char *ext = path + len - 4;
+    return ( tolower( (unsigned char)ext[0] ) == '.' &&
+             tolower( (unsigned char)ext[1] ) == 'p' &&
+             tolower( (unsigned char)ext[2] ) == 'k' &&
+             tolower( (unsigned char)ext[3] ) == '3' );
+}
 
 extern "C" {
 
@@ -49,9 +134,116 @@ extern "C" {
 #include "../qcommon/qcommon.h"
 #include "sys_local.h"
 
+/*
+==================
+__wrap_fopen
+==================
+Intercepts standard calls to fopen() at link time.
+Handles path normalization, missing-file checks, and .pk3 RAM-caching.
+*/
+FILE *__wrap_fopen( const char *path, const char *mode ) {
+    if ( !path ) return NULL;
+
+    Com_Printf("__wrap_fopen: %s (mode: %s)\n", path, mode);
+
+    // Sanitize leading double slashes (e.g. "//baseq3/pak0.pk3" -> "/baseq3/pak0.pk3")
+    const char *clean_path = path;
+    while ( clean_path[0] == '/' && clean_path[1] == '/' ) {
+        clean_path++;
+    }
+
+    // Attempt to open standard file from disk using real C library symbol
+    FILE *disk_f = __real_fopen( clean_path, mode );
+    if ( !disk_f ) {
+        return NULL;
+    }
+
+    Com_Printf("__wrap_fopen: Disk file opened: %s\n", clean_path);
+
+    // Intercept read operations for .pk3 archives
+    if ( ( mode[0] == 'r' || mode[0] == 'b' ) && IsPK3File( clean_path ) ) {
+        std::string key( clean_path );
+
+        // Cache HIT: Return RAM-backed FILE* cookie
+        auto it = g_ramCache.find( key );
+        if ( it != g_ramCache.end() ) {
+            __real_fclose( disk_f );
+            Com_Printf("RAM CACHE HIT: %s\n", clean_path);
+            RamCookie *rc = new RamCookie{ it->second.data, it->second.size, 0 };
+            return fopencookie( rc, "rb", ram_funcs );
+        }
+
+        // Cache MISS: Load .pk3 file contents into RAM
+        fseek( disk_f, 0, SEEK_END );
+        long file_size = ftell( disk_f );
+        fseek( disk_f, 0, SEEK_SET );
+
+        if ( file_size > 0 ) {
+            Com_Printf("RAM CACHE LOADING: %s (%ld bytes)\n", clean_path, file_size);
+            char *cached_data = (char *)malloc( file_size );
+            if ( cached_data ) {
+                // 1. Expand the stream's internal buffer to 1MB to maximize SD card burst speed
+                setvbuf( disk_f, NULL, _IOFBF, 1024 * 1024 );
+
+                // 2. Read in large 1MB blocks to prevent C-library / FAT overhead
+                constexpr size_t BLOCK_SIZE = 1024 * 1024; // 1MB block size
+                size_t total_bytes_read = 0;
+
+                while ( total_bytes_read < (size_t)file_size ) {
+                    size_t bytes_to_read = BLOCK_SIZE;
+                    if ( total_bytes_read + bytes_to_read > (size_t)file_size ) {
+                        bytes_to_read = (size_t)file_size - total_bytes_read;
+                    }
+
+                    size_t read_count = fread( cached_data + total_bytes_read, 1, bytes_to_read, disk_f );
+                    total_bytes_read += read_count;
+
+                    // Handle early EOF or disk read errors
+                    if ( read_count == 0 && ferror( disk_f ) ) {
+                        Com_Printf("RAM CACHE READ ERROR: %s\n", clean_path);
+                        break;
+                    }
+                }
+
+                __real_fclose( disk_f );
+
+                g_ramCache[key] = CachedFile{ cached_data, (size_t)file_size };
+
+                RamCookie *rc = new RamCookie{ cached_data, (size_t)file_size, 0 };
+                Com_Printf("RAM CACHE CREATED: %s (%ld bytes)\n", clean_path, file_size);
+                return fopencookie( rc, "rb", ram_funcs );
+            } else {
+                Com_Printf("RAM CACHE MALLOC FAILED: %s\n", clean_path);
+                fseek( disk_f, 0, SEEK_SET );
+            }
+        }
+    }
+
+    Com_Printf("__wrap_fopen: Regular file handle returned: %s\n", clean_path);
+    // Default stream buffer for non-PK3 disk handles
+    if ( mode[0] == 'r' || mode[0] == 'b' ) {
+        setvbuf( disk_f, NULL, _IOFBF, 64 * 1024 );
+    }
+    return disk_f;
+}
+
+/*
+==================
+__wrap_fclose
+==================
+Ensures close calls map cleanly to real fclose.
+*/
+int __wrap_fclose( FILE *fp ) {
+	Com_Printf("Sys_FClose: %p\n", fp);
+    if ( !fp ) return 0;
+    return __real_fclose( fp );
+}
+
 static CBcmRandomNumberGenerator *g_pHwRandom = nullptr;
 static bool g_RngSeeded = false;
 static uint32_t g_PrngState = 0;
+
+void *test_fopencookie = (void *)fopencookie;
 
 qboolean stdinIsATTY;
 
@@ -63,24 +255,6 @@ static char steamPath[ MAX_OSPATH ] = { 0 };
 
 // Used to store the GOG Quake 3 installation path
 static char gogPath[ MAX_OSPATH ] = { 0 };
-
-/*
-static const char *timestamp(void)
-{
-    time_t t = time(NULL);
-    char *retval = asctime(localtime(&t));
-    if (retval) {
-        char *ptr;
-        for (ptr = retval; *ptr; ptr++) {
-            if ((*ptr == '\r') || (*ptr == '\n')) {
-                *ptr = '\0';
-                break;
-            }
-        }
-    }
-    return retval ? retval : "[date unknown]";
-}
-*/
 
 static const char *timestamp(void)
 {
@@ -97,7 +271,7 @@ Sys_DefaultHomePath
 */
 char *Sys_DefaultHomePath(void)
 {
-	return "/";
+	return "";
 }
 
 /*
@@ -107,7 +281,6 @@ Sys_SteamPath
 */
 char *Sys_SteamPath( void )
 {
-	// Disabled since Steam doesn't let you install Quake 3 on Circle
 	return steamPath;
 }
 
@@ -118,7 +291,6 @@ Sys_GogPath
 */
 char *Sys_GogPath( void )
 {
-	// GOG also doesn't let you install Quake 3 on Circle
 	return gogPath;
 }
 
@@ -129,27 +301,24 @@ Sys_Milliseconds
 */
 int Sys_Milliseconds (void)
 {
-	return (int)(CTimer::GetClockTicks64() / 1000);
+	return (int)(CTimer::GetClockTicks() / 1000);
 }
 
-// Fast xorshift32 PRNG (takes ~1 CPU cycle per byte)
+// Fast xorshift32 PRNG
 static uint32_t FastRandom32(void)
 {
-    // Seed on first run using hardware RNG
     if (!g_RngSeeded)
     {
-	if (!g_pHwRandom) {
+        if (!g_pHwRandom) {
             g_pHwRandom = new CBcmRandomNumberGenerator();
         }
         g_PrngState = g_pHwRandom->GetNumber();
-        // Ensure state is non-zero
         if (g_PrngState == 0) {
             g_PrngState = 0xA5A5A5A5;
         }
         g_RngSeeded = true;
     }
 
-    // Xorshift algorithm
     uint32_t x = g_PrngState;
     x ^= x << 13;
     x ^= x >> 17;
@@ -165,14 +334,13 @@ Sys_RandomBytes
 */
 qboolean Sys_RandomBytes( byte *string, int len )
 {
-if (!string || len <= 0)
+    if (!string || len <= 0)
     {
         return qfalse;
     }
 
     int i = 0;
 
-    // Fill buffer using PRNG
     while (i + 4 <= len)
     {
         uint32_t nNumber = FastRandom32();
@@ -185,7 +353,6 @@ if (!string || len <= 0)
         i += 4;
     }
 
-    // Trailing bytes
     if (i < len)
     {
         uint32_t nNumber = FastRandom32();
@@ -254,21 +421,10 @@ const char *Sys_Dirname( char *path )
 ==============
 Sys_FOpen
 ==============
+Simple pass-through wrapper to fopen.
 */
 FILE *Sys_FOpen( const char *ospath, const char *mode ) {
-	struct stat buf;
-
-	// check if path exists and is a directory
-	if ( !stat( ospath, &buf ) && S_ISDIR( buf.st_mode ) )
-		return NULL;
-
-	FILE *f = fopen( ospath, mode );
-	if ( f && (mode[0] == 'r' || mode[0] == 'b') ) {
-		// Set a 64KB read buffer for SD card block streaming
-		setvbuf( f, NULL, _IOFBF, 64 * 1024 );
-	}
-	return f;
-
+    return fopen( ospath, mode );
 }
 
 /*
@@ -298,7 +454,6 @@ FILE *Sys_Mkfifo( const char *ospath )
 	int	fn;
 	struct	stat buf;
 
-	// if file already exists AND is a pipefile, remove it
 	if( !stat( ospath, &buf ) && S_ISFIFO( buf.st_mode ) )
 		FS_Remove( ospath );
 
@@ -461,7 +616,6 @@ char **Sys_ListFiles( const char *directory, const char *extension, char *filter
 
 	extLen = strlen( extension );
 
-	// search
 	nfiles = 0;
 
 	if ((fdir = opendir(directory)) == NULL) {
@@ -482,7 +636,7 @@ char **Sys_ListFiles( const char *directory, const char *extension, char *filter
 				Q_stricmp(
 					d->d_name + strlen( d->d_name ) - extLen,
 					extension ) ) {
-				continue; // didn't match
+				continue;
 			}
 		}
 
@@ -496,7 +650,6 @@ char **Sys_ListFiles( const char *directory, const char *extension, char *filter
 
 	closedir(fdir);
 
-	// return a copy of the list
 	*numfiles = nfiles;
 
 	if ( !nfiles ) {
@@ -535,8 +688,6 @@ void Sys_FreeFileList( char **list )
 /*
 ==================
 Sys_Sleep
-
-Block execution for msec or until input is received.
 ==================
 */
 void Sys_Sleep( int msec )
@@ -556,8 +707,6 @@ void Sys_Sleep( int msec )
 /*
 ==============
 Sys_ErrorDialog
-
-Display an error message
 ==============
 */
 void Sys_ErrorDialog( const char *error )
@@ -573,8 +722,6 @@ void Sys_ErrorDialog( const char *error )
 
 	Sys_Print( va( "%s\n", error ) );
 
-	// Make sure the write path for the crashlog exists...
-
 	if(!Sys_Mkdir(homepath))
 	{
 		Com_Printf("ERROR: couldn't create path '%s' for crash log.\n", homepath);
@@ -587,9 +734,6 @@ void Sys_ErrorDialog( const char *error )
 		return;
 	}
 
-	// We might be crashing because we maxed out the Quake MAX_FILE_HANDLES,
-	// which will come through here, so we don't want to recurse forever by
-	// calling FS_FOpenFileWrite()...use the Unix system APIs instead.
 	f = open( ospath, O_CREAT | O_TRUNC | O_WRONLY, 0640 );
 	if( f == -1 )
 	{
@@ -597,7 +741,6 @@ void Sys_ErrorDialog( const char *error )
 		return;
 	}
 
-	// We're crashing, so we don't care much if write() or close() fails.
 	while( ( size = CON_LogRead( buffer, sizeof( buffer ) ) ) > 0 ) {
 		if( write( f, buffer, size ) != size ) {
 			Com_Printf( "ERROR: couldn't fully write to %s\n", fileName );
@@ -611,9 +754,6 @@ void Sys_ErrorDialog( const char *error )
 /*
 ==============
 Sys_CrashLog
-
-Send error messages to crashlog.txt. This can be used
-for errors that happen before cvars are initialized.
 ==============
 */
 void Sys_CrashLog( const char *error )
@@ -628,13 +768,9 @@ void Sys_CrashLog( const char *error )
 	char *dirpath = FS_BuildOSPath( homepath, gamedir, "");
 	char *ospath = FS_BuildOSPath( homepath, gamedir, fileName );
 
-	// Print crash log header/timestamp.
 	Sys_Print( va( "\n===================== %s =====================", timestamp() ) );
-
-	// Print error message.
 	Sys_Print( va( "\n%s\n", error ) );
 
-	// Make sure the write path for the crashlog exists...
 	if(!Sys_Mkdir(homepath))
 	{
 		Com_Printf("ERROR: couldn't create path '%s' for crash log.\n", homepath);
@@ -647,7 +783,6 @@ void Sys_CrashLog( const char *error )
 		return;
 	}
 
-	// Use the Unix system APIs to write the crash log.
 	f = open( ospath, O_CREAT | O_TRUNC | O_WRONLY, 0640 );
 	if( f == -1 )
 	{
@@ -665,76 +800,23 @@ void Sys_CrashLog( const char *error )
 	close( f );
 }
 
-/*
-==============
-Sys_ClearExecBuffer
-==============
-*/
-static void Sys_ClearExecBuffer( void )
-{
+static void Sys_ClearExecBuffer( void ) {}
+static void Sys_AppendToExecBuffer( const char *text ) {}
 
-}
-
-/*
-==============
-Sys_AppendToExecBuffer
-==============
-*/
-static void Sys_AppendToExecBuffer( const char *text )
-{
-}
-
-/*
-==============
-Sys_Exec
-==============
-*/
 static int Sys_Exec( void )
 {
 	Com_Printf( "Sys_Exec: Cannot execute external commands on bare-metal target.\n" );
 	return -1;
 }
 
-/*
-==============
-Sys_ZenityCommand
-==============
-*/
-static void Sys_ZenityCommand( dialogType_t type, const char *message, const char *title )
-{
-}
+static void Sys_ZenityCommand( dialogType_t type, const char *message, const char *title ) {}
+static void Sys_KdialogCommand( dialogType_t type, const char *message, const char *title ) {}
+static void Sys_XmessageCommand( dialogType_t type, const char *message, const char *title ) {}
 
-/*
-==============
-Sys_KdialogCommand
-==============
-*/
-static void Sys_KdialogCommand( dialogType_t type, const char *message, const char *title )
-{
-}
-
-/*
-==============
-Sys_XmessageCommand
-==============
-*/
-static void Sys_XmessageCommand( dialogType_t type, const char *message, const char *title )
-{
-}
-
-/*
-==============
-Sys_Dialog
-
-Display a *nix dialog box
-==============
-*/
 dialogResult_t Sys_Dialog( dialogType_t type, const char *message, const char *title )
 {
-	// Log the dialog prompt out to UART / Circle log
     Com_Printf( "[DIALOG - %s]: %s\n", title ? title : "Notice", message ? message : "" );
 
-    // Auto-acknowledge so the engine proceeds safely
     if ( type == DT_YES_NO ) {
         return DR_YES;
     }
@@ -742,109 +824,40 @@ dialogResult_t Sys_Dialog( dialogType_t type, const char *message, const char *t
     return DR_OK;
 }
 
-/*
-==============
-Sys_GLimpSafeInit
-
-Unix specific "safe" GL implementation initialisation
-==============
-*/
-void Sys_GLimpSafeInit( void )
-{
-	// NOP
-}
-
-/*
-==============
-Sys_GLimpInit
-
-Unix specific GL implementation initialisation
-==============
-*/
-void Sys_GLimpInit( void )
-{
-	// NOP
-}
+void Sys_GLimpSafeInit( void ) {}
+void Sys_GLimpInit( void ) {}
 
 void Sys_SetFloatEnv(void)
 {
-	// rounding toward nearest
 	fesetround(FE_TONEAREST);
 
 #if defined(__arm__) || defined(__aarch64__)
-    // Enable Flush-to-Zero (FTZ) mode on ARM VFP/NEON to prevent subnormal traps
     uint32_t fpscr;
     __asm__ volatile("mrc p10, 7, %0, cr1, cr0, 0" : "=r"(fpscr));
-    fpscr |= (1 << 24); // Set FTZ bit
+    fpscr |= (1 << 24);
     __asm__ volatile("mcr p10, 7, %0, cr1, cr0, 0" :: "r"(fpscr));
 #endif
 }
 
-/*
-==============
-Sys_PlatformInit
-
-Circle specific initialisation
-==============
-*/
 void Sys_PlatformInit( void )
 {
 	Sys_SetFloatEnv();
 	stdinIsATTY = qfalse;
 }
 
-/*
-==============
-Sys_PlatformExit
+void Sys_PlatformExit( void ) {}
+void Sys_SetEnv(const char *name, const char *value) {}
 
-Unix specific deinitialisation
-==============
-*/
-void Sys_PlatformExit( void )
-{
-}
-
-/*
-==============
-Sys_SetEnv
-
-set/unset environment variables (empty value removes it)
-==============
-*/
-
-void Sys_SetEnv(const char *name, const char *value)
-{
-	// Circle does not support environment variables, so this is a no-op
-}
-
-/*
-==============
-Sys_PID
-==============
-*/
 int Sys_PID( void )
 {
-	// Circle only has one process, so return 1
 	return 1;
 }
 
-/*
-==============
-Sys_PIDIsRunning
-==============
-*/
 qboolean Sys_PIDIsRunning( int pid )
 {
-	return qtrue; // Circle only has one process, so it's always running
+	return qtrue;
 }
 
-/*
-=================
-Sys_DllExtension
-
-Check if filename should be allowed to be loaded as a DLL.
-=================
-*/
 qboolean Sys_DllExtension( const char *name ) {
 	const char *p;
 	char c = 0;
@@ -853,13 +866,11 @@ qboolean Sys_DllExtension( const char *name ) {
 		return qtrue;
 	}
 
-	// Check for format of filename.so.1.2.3
 	p = strstr( name, DLL_EXT "." );
 
 	if ( p ) {
 		p += strlen( DLL_EXT );
 
-		// Check if .so is only followed for periods and numbers.
 		while ( *p ) {
 			c = *p;
 
@@ -870,7 +881,6 @@ qboolean Sys_DllExtension( const char *name ) {
 			p++;
 		}
 
-		// Don't allow filename to end in a period. file.so., file.so.0., etc
 		if ( c != '.' ) {
 			return qtrue;
 		}

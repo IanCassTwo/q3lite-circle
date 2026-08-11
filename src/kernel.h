@@ -41,7 +41,9 @@
 #include <circle/sound/hdmisoundbasedevice.h>
 #include <vc4/sound/vchiqsoundbasedevice.h>
 #include <circle/sound/pwmsoundbasedevice.h>
-
+#include <circle/net/netsubsystem.h>
+#include <wlan/hostap/wpa_supplicant/wpasupplicant.h>
+#include <wlan/bcm4343.h>
 
 enum TShutdownMode
 {
@@ -57,6 +59,7 @@ public:
 	~CKernel (void);
 
 	boolean Initialize (void);
+	CNetSubSystem* GetNetwork();
 
 	static void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
 	static void KeyboardRemovedHandler (CDevice *pDevice, void *pContext);
@@ -82,11 +85,16 @@ private:
 	CEMMCDevice		m_EMMC;
 	FATFS                   m_RootFileSystem;
 	CVCHIQDevice		m_VCHIQ;
+	CBcm4343Device          m_WLAN;
+	CNetSubSystem           m_Net;
+        CWPASupplicant          m_WPASupplicant;
+
 	CUSBHCIDevice		m_USBHCI;
 	CUSBKeyboardDevice * volatile m_pKeyboard;
 	CMouseDevice * volatile m_pMouse;
 	CSoundBaseDevice	*m_pHDMISound;
 	static CKernel *s_pThis;
+	boolean m_bNetworkAvailable;
 };
 
 #endif

@@ -107,6 +107,9 @@ static const int s_UsbToQ3KeyMap[256] = {
 #define K_MWHEELDOWN  184
 
 #define SOUND_CHUNK_SIZE      (384 * 10)
+#define SUPPLICANT_CONFIG_FILE ROOTDRIVE "/wpa_supplicant.conf"
+#define HOSTNAME "q3lite"
+#define FIRMWARE_PATH "/firmware/"
 
 // Initialize the shared ring buffer globals
 rawInputEvent_t g_inputQueue[INPUT_QUEUE_SIZE];
@@ -116,6 +119,8 @@ volatile int g_queueTail = 0;
 // Global mouse motion counters
 volatile int g_mouseDeltaX = 0;
 volatile int g_mouseDeltaY = 0;
+
+
 
 LOGMODULE("kernel");
 
@@ -145,15 +150,19 @@ static void PushKeyEvent(int key, int isDown)
 CKernel *CKernel::s_pThis = 0;
 
 CKernel::CKernel (void)
-:	m_Screen (m_Options.GetWidth (), m_Options.GetHeight ()),
-	m_Timer (&m_Interrupt),
-	m_Logger (m_Options.GetLogLevel (), &m_Timer),	
-	m_EMMC (&m_Interrupt, &m_Timer, &m_ActLED),	
-	m_VCHIQ (CMemorySystem::Get (), &m_Interrupt),
-	m_USBHCI (&m_Interrupt, &m_Timer, TRUE),		// TRUE: enable plug-and-play
-	m_pKeyboard (0),
-	m_pMouse (0),
-	m_pHDMISound (0)
+:       m_Screen (m_Options.GetWidth (), m_Options.GetHeight ()),
+        m_Timer (&m_Interrupt),
+        m_Logger (m_Options.GetLogLevel (), &m_Timer),
+        m_EMMC (&m_Interrupt, &m_Timer, &m_ActLED),
+        m_VCHIQ (CMemorySystem::Get (), &m_Interrupt),
+        m_WLAN (FIRMWARE_PATH),
+        m_Net (0, 0, 0, 0, HOSTNAME, NetDeviceTypeWLAN),
+        m_WPASupplicant (SUPPLICANT_CONFIG_FILE),
+        m_USBHCI (&m_Interrupt, &m_Timer, TRUE),
+        m_pKeyboard (0),
+        m_pMouse (0),
+        m_pHDMISound (0)
+
 {
 	s_pThis = this;
 	m_ActLED.Blink (5);	// show we are alive
@@ -241,12 +250,56 @@ boolean CKernel::Initialize (void)
 		bOK = m_USBHCI.Initialize ();
 	}
 
+	if (bOK)
+	{
+		if (!m_WLAN.Initialize())
+		{
+		    LOGWARN("WLAN not available - continuing without network");
+		    m_bNetworkAvailable = FALSE;
+		}
+		else
+		{
+		    LOGNOTE("Initialized WLAN");
+		    m_bNetworkAvailable = TRUE;
+		}
+	}
+
+	if (bOK && m_bNetworkAvailable)
+	{
+		if (!m_Net.Initialize(FALSE))
+		{
+		    LOGWARN("Network initialization failed - continuing without network");
+		    m_bNetworkAvailable = FALSE;
+		}
+		else
+		{
+		    LOGNOTE("Initialized network");
+		}
+	}
+
+
+	if (bOK && m_bNetworkAvailable)
+	{
+		if (!m_WPASupplicant.Initialize())
+		{
+		    LOGWARN("WPA supplicant initialization failed - continuing without network");
+		    m_bNetworkAvailable = FALSE;
+		}
+		else
+		{
+		    LOGNOTE("Initialized WPA supplicant");
+		}
+	}
+
 	return bOK;
 }
 
 TShutdownMode CKernel::Run (void)
 {
+	LOGNOTE("====== Welcome to q3Lite ======");
 	LOGNOTE("Compile time: " __DATE__ " " __TIME__);
+	LOGNOTE("Memory Size: %u", CMemorySystem::Get()->GetMemSize());
+	LOGNOTE("===============================");
 
 	// Search for USB devices
 	boolean bUpdated = m_USBHCI.UpdatePlugAndPlay ();
@@ -400,4 +453,9 @@ void CKernel::MouseRemovedHandler (CDevice *pDevice, void *pContext)
 	assert (s_pThis != 0);
 	LOGNOTE("Mouse removed");
 	s_pThis->m_pMouse = 0;
+}
+
+CNetSubSystem *CKernel::GetNetwork()
+{
+    return &m_Net;
 }

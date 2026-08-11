@@ -21,7 +21,6 @@ Q3LITE_BOTLIB_SRCS   = $(wildcard $(Q3_SRC)/botlib/*.c)
 # System and Platform port files
 Q3LITE_CIRCLE_SRCS   = $(Q3_SRC)/circle/circle_glimp.c \
                        $(Q3_SRC)/circle/circle_input.c \
-                       $(Q3_SRC)/circle/circle_net_ip.c \
                        $(Q3_SRC)/circle/vm_arm7l_circle.c \
                        $(Q3_SRC)/circle/circle_gamma.c 
                        #$(Q3_SRC)/circle/vm_arm7l_circle.c
@@ -29,6 +28,7 @@ Q3LITE_CIRCLE_SRCS   = $(Q3_SRC)/circle/circle_glimp.c \
 Q3LITE_SYS_CPPS      = $(Q3_SRC)/circle/sys_circle.cpp \
                        $(Q3_SRC)/circle/con_circle.cpp \
                        $(Q3_SRC)/circle/circle_snd.cpp \
+                       $(Q3_SRC)/circle/circle_net_ip.cpp \
                        $(Q3_SRC)/circle/sys_main_circle.cpp 
 
 # Re-enabled sv_bot.c
@@ -101,9 +101,10 @@ include $(CIRCLEHOME)/Rules.mk
 # Include Paths & CFLAGS (Added -DBOTLIB)
 CFLAGS += -I. \
 	  -I"$(NEWLIBDIR)/include" \
+	  -I $(STDDEF_INCPATH) -I $(STDLIBHOME)/include -I $(CIRCLEHOME)/include \
           -I../libs/circle-stdlib/include \
           -I$(CIRCLEHOME)/addon \
-          -D__CIRCLE__ -D__RASPBERRYPI__ -DHAVE_BOOLEAN -DNO_NET \
+          -D__CIRCLE__ -D__RASPBERRYPI__ -DHAVE_BOOLEAN \
           -DOS_STRING=\"circle\" -DARCH_STRING=\"arm\" \
           -DID_INLINE=inline -DPATH_SEP=47 -DPATH_SEP_CHAR=47 -D__Q3_PATH_SEP__=47 \
           -DDLL_EXT=\".so\" -DQ3_LITTLE_ENDIAN -DUSE_GLES -DQGL_DIRECT \
@@ -141,10 +142,15 @@ LIBS := --start-group \
        $(CIRCLEHOME)/addon/vc4/vchiq/libvchiq.a \
        $(CIRCLEHOME)/addon/vc4/sound/libvchiqsound.a \
        $(CIRCLEHOME)/addon/linux/liblinuxemu.a \
+       $(CIRCLEHOME)/lib/net/libnet.a \
+       $(CIRCLEHOME)/addon/wlan/hostap/wpa_supplicant/libwpa_supplicant.a \
+       $(CIRCLEHOME)/addon/wlan/libwlan.a \
        $(CIRCLEHOME)/lib/sched/libsched.a \
        $(CIRCLEHOME)/lib/fs/libfs.a \
        $(CIRCLEHOME)/lib/libcircle.a \
        --end-group
+
+LDFLAGS += --wrap=fopen --wrap=fclose
 
 # Automated VPATH patterns to find sources across subdirectories
 vpath %.c $(Q3_SRC)/qcommon
