@@ -5,26 +5,26 @@ This project combines the Quake III Arena lightweight engine (q3lite) with the b
 
 ## Status
 
-🚧 **Early work in progress**
+🚧 **Feature complete**
 
 The project currently:
 
-* ✅ Boots and runs on Raspberry Pi hardware
-* ✅ Produces graphical output
-* ✅ Keyboard input working
-* ✅ Mouse input working
-* ✅ Sound output working
+* ✅ Boots and runs on Raspberry Pi 2 or 3 hardware
+* ✅ Hardware Accelerated OpenGLES1.1 with Vidcore
+* ✅ Keyboard and mouse input working
+* ✅ Sound working via HDMI
 * ✅ JIT Compiler for QVM (working with caveats)
-* ❌ Networking
+* ✅ Networking working
 
 The current focus is bringing up the remaining platform functionality required for a complete playable experience.
 
 ## Supported hardware
 The project has been tested on:
 
+* Raspberry Pi 2 (32-bit) but does not have wifi, so no networking
 * Raspberry Pi 2 (32-bit)
 
-It is expected to support other Raspberry Pi models supported by Circle, although hardware-specific testing is still ongoing.
+Raspberry Pi 4 and 5 are not supported because VCHIQ driver does not support these models
 
 ## Architecture
 Unlike traditional Raspberry Pi software running under Linux, this project runs directly on the hardware:
@@ -98,14 +98,13 @@ TODO list includes:
 
 * [ ] Improved hardware compatibility testing
 * [ ] Performance tuning including multi-core
-* [ ] Networking
 
 ## QVM JIT
 The QVM JIT compiler requires dynamic memory execution. Because Circle does not implement POSIX `mmap()` or `mprotect()`, heap memory is marked as Execute-Never (`XN`) by default, preventing execution of dynamically emitted native ARM code.
 
 To enable the JIT compiler, complete the following two steps:
 
-1) **Enable Executable Heap Memory in Circle:** Find pagetable.cpp inside Circle under the circle-stdlib source rree. Change the nAttributes from ARMV6MMUL1SECTION_NORMAL_XN to ARMV6MMUL1SECTION_NORMAL. Note on Security: Disabling the XN bit globally allows code to be executed directly from RAM heap sections. This will remove hardware-level execution protection against stack/heap buffer overflows. It's up to you to evaluate the risk.
+1) **Enable Executable Heap Memory in Circle:** Find pagetable.cpp inside Circle under the circle-stdlib source rree. Change the nAttributes from `ARMV6MMUL1SECTION_NORMAL_XN` to `ARMV6MMUL1SECTION_NORMAL`. Note on Security: Disabling the XN bit globally allows code to be executed directly from RAM heap sections. This will remove hardware-level execution protection against stack/heap buffer overflows. It's up to you to evaluate the risk.
 2) **Enable the JIT Build Flag** Add -DCIRCLE_VM_JIT_EXPERIMENTAL to your CFLAGS in your Makefile 
 
 ## Background
