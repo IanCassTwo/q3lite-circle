@@ -385,7 +385,7 @@ static	void R_LoadLightmaps( lump_t *l, lump_t *surfs ) {
 					color[1] = buf_p[j*4+1] * exponent;
 					color[2] = buf_p[j*4+2] * exponent;
 #else // HDRFILE_FLOAT
-					memcpy(color, &buf_p[j*12], 12);
+					Com_Memcpy(color, &buf_p[j*12], 12);
 
 					color[0] = LittleFloat(color[0]);
 					color[1] = LittleFloat(color[1]);

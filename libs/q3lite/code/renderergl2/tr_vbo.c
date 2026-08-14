@@ -277,31 +277,31 @@ vao_t *R_CreateVao2(const char *name, int numVertexes, srfVert_t *verts, int num
 	for (i = 0; i < numVertexes; i++)
 	{
 		// xyz
-		memcpy(data + dataOfs, &verts[i].xyz, sizeof(verts[i].xyz));
+		Com_Memcpy(data + dataOfs, &verts[i].xyz, sizeof(verts[i].xyz));
 		dataOfs += sizeof(verts[i].xyz);
 
 		// normal
-		memcpy(data + dataOfs, &verts[i].normal, sizeof(verts[i].normal));
+		Com_Memcpy(data + dataOfs, &verts[i].normal, sizeof(verts[i].normal));
 		dataOfs += sizeof(verts[i].normal);
 
 		// tangent
-		memcpy(data + dataOfs, &verts[i].tangent, sizeof(verts[i].tangent));
+		Com_Memcpy(data + dataOfs, &verts[i].tangent, sizeof(verts[i].tangent));
 		dataOfs += sizeof(verts[i].tangent);
 
 		// texcoords
-		memcpy(data + dataOfs, &verts[i].st, sizeof(verts[i].st));
+		Com_Memcpy(data + dataOfs, &verts[i].st, sizeof(verts[i].st));
 		dataOfs += sizeof(verts[i].st);
 
 		// lightmap texcoords
-		memcpy(data + dataOfs, &verts[i].lightmap, sizeof(verts[i].lightmap));
+		Com_Memcpy(data + dataOfs, &verts[i].lightmap, sizeof(verts[i].lightmap));
 		dataOfs += sizeof(verts[i].lightmap);
 
 		// colors
-		memcpy(data + dataOfs, &verts[i].color, sizeof(verts[i].color));
+		Com_Memcpy(data + dataOfs, &verts[i].color, sizeof(verts[i].color));
 		dataOfs += sizeof(verts[i].color);
 
 		// light directions
-		memcpy(data + dataOfs, &verts[i].lightdir, sizeof(verts[i].lightdir));
+		Com_Memcpy(data + dataOfs, &verts[i].lightdir, sizeof(verts[i].lightdir));
 		dataOfs += sizeof(verts[i].lightdir);
 	}
 

@@ -198,7 +198,10 @@ boolean CKernel::Initialize (void)
 		}
 
 		bOK = m_Logger.Initialize (pTarget);
-		LOGNOTE("Initialized logger");
+		LOGNOTE("====== Welcome to q3Lite ======");
+		LOGNOTE("Compile time: " __DATE__ " " __TIME__);
+		LOGNOTE("Memory Size: %u", CMemorySystem::Get()->GetMemSize());
+		LOGNOTE("===============================");
 	}
 
 	if (bOK)
@@ -221,8 +224,8 @@ boolean CKernel::Initialize (void)
 
 	if (bOK)
 	{
-		m_pHDMISound = new CHDMISoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
-		//m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationAuto);
+		//m_pHDMISound = new CHDMISoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
+		m_pHDMISound = new CVCHIQSoundBaseDevice (&m_VCHIQ, 44100, SOUND_CHUNK_SIZE, VCHIQSoundDestinationAuto);
 		//m_pHDMISound = new CPWMSoundBaseDevice (&m_Interrupt, 44100, SOUND_CHUNK_SIZE);
 
 	    	LOGNOTE("Initialized HDMI Sound");
@@ -231,7 +234,7 @@ boolean CKernel::Initialize (void)
 	if (bOK)
 	{
 		bOK = m_EMMC.Initialize ();
-		LOGNOTE("Initialized EMMC");
+		LOGNOTE("Initialized SD Card");
 	}
 
 	if (bOK)
@@ -248,6 +251,7 @@ boolean CKernel::Initialize (void)
 	if (bOK)
 	{
 		bOK = m_USBHCI.Initialize ();
+		LOGNOTE("Initialized USB Controller");
 	}
 
 	if (bOK)
@@ -296,10 +300,6 @@ boolean CKernel::Initialize (void)
 
 TShutdownMode CKernel::Run (void)
 {
-	LOGNOTE("====== Welcome to q3Lite ======");
-	LOGNOTE("Compile time: " __DATE__ " " __TIME__);
-	LOGNOTE("Memory Size: %u", CMemorySystem::Get()->GetMemSize());
-	LOGNOTE("===============================");
 
 	// Search for USB devices
 	boolean bUpdated = m_USBHCI.UpdatePlugAndPlay ();
@@ -308,11 +308,11 @@ TShutdownMode CKernel::Run (void)
 	if (bUpdated && m_pKeyboard == 0) {
 		m_pKeyboard = (CUSBKeyboardDevice *) m_DeviceNameService.GetDevice ("ukbd1", FALSE);
 		if (m_pKeyboard != 0) {
-			LOGNOTE("Keyboard found");
+			LOGNOTE("USB Keyboard found");
 			m_pKeyboard->RegisterRemovedHandler (KeyboardRemovedHandler);
 			m_pKeyboard->RegisterKeyStatusHandlerRaw (KeyStatusHandlerRaw);
 		} else {
-			LOGNOTE("Keyboard not found");
+			LOGNOTE("USB Keyboard not found");
 		}
 	}
 
@@ -320,18 +320,19 @@ TShutdownMode CKernel::Run (void)
 	if (bUpdated && m_pMouse == 0) {
 		m_pMouse = (CMouseDevice *) m_DeviceNameService.GetDevice ("mouse1", FALSE);
 		if (m_pMouse != 0) {
-			LOGNOTE("Mouse found");
+			LOGNOTE("USB Mouse found");
 			m_pMouse->RegisterRemovedHandler (MouseRemovedHandler);
 			m_pMouse->RegisterStatusHandler (MouseStatusHandler);
 		} else {
-			LOGNOTE("Mouse not found");
+			LOGNOTE("USB Mouse not found");
 		}
 	}
 
 	// Run Quake
+	LOGNOTE("Initialization complete");
 	_main ();
 
-	return ShutdownHalt;
+	return ShutdownReboot;
 }
 
 void CKernel::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6])
@@ -455,7 +456,3 @@ void CKernel::MouseRemovedHandler (CDevice *pDevice, void *pContext)
 	s_pThis->m_pMouse = 0;
 }
 
-CNetSubSystem *CKernel::GetNetwork()
-{
-    return &m_Net;
-}

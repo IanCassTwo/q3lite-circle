@@ -382,7 +382,7 @@ void GLimp_Init( qboolean fixedFunction )
     glConfig.isFullscreen = qtrue;
     glConfig.driverType = GLDRV_ICD;
     glConfig.hardwareType = GLHW_GENERIC;
-    glConfig.deviceSupportsGamma = qtrue;
+    glConfig.deviceSupportsGamma = qfalse;
 
     // Retrieve Driver Strings
     Q_strncpyz( glConfig.vendor_string, (char *) qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
@@ -424,11 +424,14 @@ void GLimp_EndFrame( void )
         //glDiscardFramebufferEXT( GL_FRAMEBUFFER_OES, 1, attachments );
 
         // Check for GL errors AFTER discard runs
+        // TODO ifdef this out for release builds, since it is expensive to check every frame
+        /*
         GLenum err = qglGetError();
         if (err != GL_NO_ERROR)
         {
             ri.Printf(PRINT_ALL, "[VIDEO] GL ERROR before swap = 0x%X\n", err);
         }
+        */
 
         EGLBoolean res = eglSwapBuffers( gl_state.display, gl_state.surface );
         if ( res == EGL_FALSE )

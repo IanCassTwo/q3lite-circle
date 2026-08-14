@@ -531,7 +531,7 @@ static void CG_RegisterItemSounds( int itemNum ) {
 				item->classname);
 			return;
 		}
-		memcpy (data, start, len);
+		Com_Memcpy (data, start, len);
 		data[len] = 0;
 		if ( *s ) {
 			s++;

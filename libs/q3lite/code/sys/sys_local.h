@@ -72,5 +72,10 @@ void Sys_ErrorDialog( const char *error );
 void Sys_CrashLog( const char *error );
 void Sys_AnsiColorPrint( const char *msg );
 
+void Sys_StartProfiler( void );
+void Sys_StopProfiler( void );
+void *SYS_Memcpy(void * __restrict dest, const void * __restrict src, size_t n);
+
+
 int Sys_PID( void );
 qboolean Sys_PIDIsRunning( int pid );

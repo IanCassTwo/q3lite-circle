@@ -117,7 +117,7 @@ void IN_Frame( void )
     int eventTime = Sys_Milliseconds();
     static qboolean shiftPressed = qfalse;
 
-    // 1. Drain input events from ring buffer
+    // Drain input events from ring buffer
     while (g_queueTail != g_queueHead) {
         rawInputEvent_t ev = g_inputQueue[g_queueTail];
         g_queueTail = (g_queueTail + 1) % INPUT_QUEUE_SIZE;
@@ -156,7 +156,7 @@ void IN_Frame( void )
         }
     }
 
-    // 2. Poll mouse movement
+    // Poll mouse movement
     if (g_mouseDeltaX != 0 || g_mouseDeltaY != 0) {
         int dx = g_mouseDeltaX;
         int dy = g_mouseDeltaY;

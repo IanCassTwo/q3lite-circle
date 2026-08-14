@@ -76,7 +76,7 @@ Q3LITE_CORE_SRCS     = $(Q3_SRC)/qcommon/q_shared.c \
                        $(Q3_SRC)/client/snd_dma.c \
                        $(Q3_SRC)/client/snd_main.c \
                        $(Q3_SRC)/client/snd_mem.c \
-                       $(Q3_SRC)/client/snd_mix.c \
+                       $(Q3_SRC)/circle/circle_snd_mix.c \
                        $(Q3_SRC)/client/snd_wavelet.c 
 
 # Combine all source lists
@@ -123,8 +123,17 @@ CFLAGS += -I. \
           -I$(Q3_SRC)/jpeg-8c \
           -I"$(CIRCLEHOME)/addon/vc4/interface/khronos/include"
 
+#	  -pg \
+
 # Inherit CFLAGS for C++ compiler
 CXXFLAGS += $(CFLAGS) -std=gnu++14
+
+CFLAGS := $(filter-out -O2 -mno-unaligned-access, $(CFLAGS))
+CXXFLAGS := $(filter-out -O2 -mno-unaligned-access, $(CXXFLAGS))
+OPTIMIZE_FLAGS := -O3 -munaligned-access -ffast-math -fno-math-errno -ftree-vectorize
+CFLAGS += $(OPTIMIZE_FLAGS)
+CXXFLAGS += $(OPTIMIZE_FLAGS)
+
 
 # Static hardware/system libraries link group
 LIBS := --start-group \
@@ -146,12 +155,14 @@ LIBS := --start-group \
        $(CIRCLEHOME)/lib/net/libnet.a \
        $(CIRCLEHOME)/addon/wlan/hostap/wpa_supplicant/libwpa_supplicant.a \
        $(CIRCLEHOME)/addon/wlan/libwlan.a \
+       $(CIRCLEHOME)/addon/profile/libprofile.a \
        $(CIRCLEHOME)/lib/sched/libsched.a \
        $(CIRCLEHOME)/lib/fs/libfs.a \
+       $(CIRCLEHOME)/lib/fs/fat/libfatfs.a \
        $(CIRCLEHOME)/lib/libcircle.a \
        --end-group
 
-LDFLAGS += --wrap=fopen --wrap=fclose
+LDFLAGS += --wrap=fopen --wrap=fclose 
 
 # Automated VPATH patterns to find sources across subdirectories
 vpath %.c $(Q3_SRC)/qcommon

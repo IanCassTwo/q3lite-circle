@@ -721,7 +721,7 @@ static qboolean R_LoadMD3(model_t * mod, int lod, void *buffer, int bufferSize, 
 			{
 				st = surf->st;
 				for ( j = 0 ; j < surf->numVerts ; j++, st++ ) {
-					memcpy(data + dataOfs, &st->st, sizeof(vec2_t));
+					Com_Memcpy(data + dataOfs, &st->st, sizeof(vec2_t));
 					dataOfs += sizeof(st->st);
 				}
 
@@ -729,15 +729,15 @@ static qboolean R_LoadMD3(model_t * mod, int lod, void *buffer, int bufferSize, 
 				for ( j = 0; j < surf->numVerts * mdvModel->numFrames ; j++, v++ )
 				{
 					// xyz
-					memcpy(data + dataOfs, &v->xyz, sizeof(vec3_t));
+					Com_Memcpy(data + dataOfs, &v->xyz, sizeof(vec3_t));
 					dataOfs += sizeof(vec3_t);
 
 					// normal
-					memcpy(data + dataOfs, &v->normal, sizeof(int16_t) * 4);
+					Com_Memcpy(data + dataOfs, &v->normal, sizeof(int16_t) * 4);
 					dataOfs += sizeof(int16_t) * 4;
 
 					// tangent
-					memcpy(data + dataOfs, &v->tangent, sizeof(int16_t) * 4);
+					Com_Memcpy(data + dataOfs, &v->tangent, sizeof(int16_t) * 4);
 					dataOfs += sizeof(int16_t) * 4;
 				}
 			}
@@ -748,19 +748,19 @@ static qboolean R_LoadMD3(model_t * mod, int lod, void *buffer, int bufferSize, 
 				for ( j = 0; j < surf->numVerts; j++, v++, st++ )
 				{
 					// xyz
-					memcpy(data + dataOfs, &v->xyz, sizeof(vec3_t));
+					Com_Memcpy(data + dataOfs, &v->xyz, sizeof(vec3_t));
 					dataOfs += sizeof(v->xyz);
 
 					// st
-					memcpy(data + dataOfs, &st->st, sizeof(vec2_t));
+					Com_Memcpy(data + dataOfs, &st->st, sizeof(vec2_t));
 					dataOfs += sizeof(st->st);
 
 					// normal
-					memcpy(data + dataOfs, &v->normal, sizeof(int16_t) * 4);
+					Com_Memcpy(data + dataOfs, &v->normal, sizeof(int16_t) * 4);
 					dataOfs += sizeof(int16_t) * 4;
 
 					// tangent
-					memcpy(data + dataOfs, &v->tangent, sizeof(int16_t) * 4);
+					Com_Memcpy(data + dataOfs, &v->tangent, sizeof(int16_t) * 4);
 					dataOfs += sizeof(int16_t) * 4;
 				}
 			}

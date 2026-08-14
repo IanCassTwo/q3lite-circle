@@ -59,7 +59,6 @@ public:
 	~CKernel (void);
 
 	boolean Initialize (void);
-	CNetSubSystem* GetNetwork();
 
 	static void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
 	static void KeyboardRemovedHandler (CDevice *pDevice, void *pContext);
@@ -68,6 +67,9 @@ public:
 	TShutdownMode Run (void);
 	static CKernel *Get (void) { return s_pThis; }
 	CSoundBaseDevice *GetSoundDevice (void) { return m_pHDMISound; }
+	FATFS *GetRootFilesystem(void) { return &m_RootFileSystem; }
+	CNetSubSystem *GetNetwork() { return &m_Net; }
+
 
 private:
 	// do not change this order

@@ -890,7 +890,7 @@ void ExtractFilePath (const char *path, char *dest)
 	while (src != path && *(src-1) != '\\' && *(src-1) != '/')
 		src--;
 
-	memcpy (dest, path, src-path);
+	Com_Memcpy (dest, path, src-path);
 	dest[src-path] = 0;
 }
 
@@ -1113,7 +1113,7 @@ void	CreatePath (const char *path)
 		c = *ofs;
 		if (c == '/' || c == '\\')
 		{	// create the directory
-			memcpy( dir, path, ofs - path );
+			Com_Memcpy( dir, path, ofs - path );
 			dir[ ofs - path ] = 0;
 			Q_mkdir( dir );
 		}

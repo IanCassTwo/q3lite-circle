@@ -239,13 +239,13 @@ int BotSortTeamMatesByTaskPreference(bot_state_t *bs, int *teammates, int numtea
 	}
 	numteammates = 0;
 	//defenders at the front of the list
-	memcpy(&teammates[numteammates], defenders, numdefenders * sizeof(int));
+	Com_Memcpy(&teammates[numteammates], defenders, numdefenders * sizeof(int));
 	numteammates += numdefenders;
 	//roamers in the middle
-	memcpy(&teammates[numteammates], roamers, numroamers * sizeof(int));
+	Com_Memcpy(&teammates[numteammates], roamers, numroamers * sizeof(int));
 	numteammates += numroamers;
 	//attacker in the back of the list
-	memcpy(&teammates[numteammates], attackers, numattackers * sizeof(int));
+	Com_Memcpy(&teammates[numteammates], attackers, numattackers * sizeof(int));
 	numteammates += numattackers;
 
 	return numteammates;

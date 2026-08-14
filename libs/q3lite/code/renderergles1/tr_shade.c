@@ -185,8 +185,8 @@ static void DrawNormals (shaderCommands_t *input) {
 	//*TODO* save states for texture & color array
 	for (i = 0 ; i < input->numVertexes ; i++) {
 		VectorMA (input->xyz[i], 2, input->normal[i], temp);
-		memcpy(vtx, input->xyz[i], sizeof(GLfloat)*3);
-		memcpy(vtx+1, temp, sizeof(GLfloat)*3);
+		Com_Memcpy(vtx, input->xyz[i], sizeof(GLfloat)*3);
+		Com_Memcpy(vtx+1, temp, sizeof(GLfloat)*3);
 		qglVertexPointer (3, GL_FLOAT, 16, vtx);
 		qglDrawArrays(GL_LINES, 0, 2);
 	}

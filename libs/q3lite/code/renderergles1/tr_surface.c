@@ -340,8 +340,8 @@ static void RB_SurfaceBeam( void )
 		qglDisableClientState( GL_TEXTURE_COORD_ARRAY );
 	GLfloat vtx[NUM_BEAM_SEGS*6+6];
 	for ( i = 0; i <= NUM_BEAM_SEGS; i++ ) {
-		memcpy(vtx+i*6, start_points[ i % NUM_BEAM_SEGS], sizeof(GLfloat)*3);
-		memcpy(vtx+i*6+3, end_points[ i % NUM_BEAM_SEGS], sizeof(GLfloat)*3);
+		Com_Memcpy(vtx+i*6, start_points[ i % NUM_BEAM_SEGS], sizeof(GLfloat)*3);
+		Com_Memcpy(vtx+i*6+3, end_points[ i % NUM_BEAM_SEGS], sizeof(GLfloat)*3);
 	}
 	qglVertexPointer (3, GL_FLOAT, 0, vtx);
 	qglDrawArrays(GL_TRIANGLE_STRIP, 0, NUM_BEAM_SEGS*2+2);

@@ -87,13 +87,13 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 	targa_header.colormap_type = buf_p[1];
 	targa_header.image_type = buf_p[2];
 	
-	memcpy(&targa_header.colormap_index, &buf_p[3], 2);
-	memcpy(&targa_header.colormap_length, &buf_p[5], 2);
+	Com_Memcpy(&targa_header.colormap_index, &buf_p[3], 2);
+	Com_Memcpy(&targa_header.colormap_length, &buf_p[5], 2);
 	targa_header.colormap_size = buf_p[7];
-	memcpy(&targa_header.x_origin, &buf_p[8], 2);
-	memcpy(&targa_header.y_origin, &buf_p[10], 2);
-	memcpy(&targa_header.width, &buf_p[12], 2);
-	memcpy(&targa_header.height, &buf_p[14], 2);
+	Com_Memcpy(&targa_header.x_origin, &buf_p[8], 2);
+	Com_Memcpy(&targa_header.y_origin, &buf_p[10], 2);
+	Com_Memcpy(&targa_header.width, &buf_p[12], 2);
+	Com_Memcpy(&targa_header.height, &buf_p[14], 2);
 	targa_header.pixel_size = buf_p[16];
 	targa_header.attributes = buf_p[17];
 
@@ -299,9 +299,9 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
       src = targa_rgba + row * 4 * columns;
       dst = targa_rgba + (rows - row - 1) * 4 * columns;
 
-      memcpy (flip, src, columns*4);
-      memcpy (src, dst, columns*4);
-      memcpy (dst, flip, columns*4);
+      Com_Memcpy (flip, src, columns*4);
+      Com_Memcpy (src, dst, columns*4);
+      Com_Memcpy (dst, flip, columns*4);
     }
     free (flip);
   }

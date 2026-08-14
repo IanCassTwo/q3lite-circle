@@ -309,7 +309,7 @@ puttokens(Tokenrow *trp)
 			write(1, (char *)p, len);
 			wbp = wbuf;
 		} else {	
-			memcpy(wbp, p, len);
+			Com_Memcpy(wbp, p, len);
 			wbp += len;
 		}
 		if (wbp >= &wbuf[OBS]) {

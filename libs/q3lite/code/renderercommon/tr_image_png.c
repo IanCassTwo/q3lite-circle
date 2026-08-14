@@ -699,7 +699,7 @@ static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
 				return(-1);
 			}
 
-			memcpy(CompressedDataPtr, OrigCompressedData, Length);
+			Com_Memcpy(CompressedDataPtr, OrigCompressedData, Length);
 			CompressedDataPtr += Length;
 		} 
 	}

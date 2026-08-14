@@ -192,7 +192,7 @@ int BotGetMessageTeamGoal(bot_state_t *bs, char *goalname, bot_goal_t *goal) {
 
 	cp = BotFindWayPoint(bs->checkpoints, goalname);
 	if (cp) {
-		memcpy(goal, &cp->goal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &cp->goal, sizeof(bot_goal_t));
 		return qtrue;
 	}
 	return qfalse;
@@ -1497,7 +1497,7 @@ float BotNearestVisibleItem(bot_state_t *bs, char *itemname, bot_goal_t *goal) {
 			BotAI_Trace(&trace, bs->eye, NULL, NULL, tmpgoal.origin, bs->client, CONTENTS_SOLID|CONTENTS_PLAYERCLIP);
 			if (trace.fraction >= 1.0) {
 				bestdist = dist;
-				memcpy(goal, &tmpgoal, sizeof(bot_goal_t));
+				Com_Memcpy(goal, &tmpgoal, sizeof(bot_goal_t));
 			}
 		}
 	} while(i > 0);

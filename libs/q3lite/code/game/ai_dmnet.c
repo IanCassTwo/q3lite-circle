@@ -390,7 +390,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 				VectorSet(bs->teamgoal.maxs, 8, 8, 8);
 			}
 		}
-		memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
 		return qtrue;
 	}
 	//if the bot accompanies someone
@@ -518,7 +518,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			}
 		}
 		//the goal the bot should go for
-		memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
 		//if the companion is NOT visible for too long
 		if (bs->teammatevisible_time < FloatTime() - 60) {
 			BotAI_BotInitialChat(bs, "accompany_cannotfind", EasyClientName(bs->teammate, netname, sizeof(netname)), NULL);
@@ -548,7 +548,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			bs->teammessage_time = 0;
 		}
 		//set the bot goal
-		memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
 		//stop after 2 minutes
 		if (bs->teamgoal_time < FloatTime()) {
 			trap_BotGoalName(bs->teamgoal.number, buf, sizeof(buf));
@@ -605,7 +605,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			bs->teammessage_time = 0;
 		}
 		//set the bot goal
-		memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
 		//stop after some time
 		if (bs->teamgoal_time < FloatTime()) {
 			bs->ltgtype = 0;
@@ -638,7 +638,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			bs->teammessage_time = 0;
 		}
 		//set the bot goal
-		memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &bs->teamgoal, sizeof(bot_goal_t));
 		//
 		if (bs->teamgoal_time < FloatTime()) {
 			if (bs->ltgtype == LTG_CAMPORDER) {
@@ -752,7 +752,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			bs->ltgtype = 0;
 			return qfalse;
 		}
-		memcpy(goal, &bs->curpatrolpoint->goal, sizeof(bot_goal_t));
+		Com_Memcpy(goal, &bs->curpatrolpoint->goal, sizeof(bot_goal_t));
 		return qtrue;
 	}
 #ifdef CTF
@@ -768,8 +768,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			}
 			//
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//if touching the flag
@@ -791,8 +791,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 		//if rushing to the base
 		if (bs->ltgtype == LTG_RUSHBASE && bs->rushbaseaway_time < FloatTime()) {
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//if not carrying the flag anymore
@@ -826,8 +826,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 			}
 			//
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//if touching the flag
@@ -851,7 +851,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 				BotVoiceChatOnly(bs, -1, VOICECHAT_ONGETFLAG);
 				bs->teammessage_time = 0;
 			}
-			memcpy(goal, &ctf_neutralflag, sizeof(bot_goal_t));
+			Com_Memcpy(goal, &ctf_neutralflag, sizeof(bot_goal_t));
 			//if touching the flag
 			if (trap_BotTouchingGoal(bs->origin, goal)) {
 				bs->ltgtype = 0;
@@ -865,8 +865,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 		//if rushing to the base
 		if (bs->ltgtype == LTG_RUSHBASE) {
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//if not carrying the flag anymore
@@ -895,8 +895,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 				bs->teammessage_time = 0;
 			}
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &ctf_blueflag, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &ctf_redflag, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//quit rushing after 2 minutes
@@ -938,8 +938,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 				bs->teammessage_time = 0;
 			}
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &blueobelisk, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &redobelisk, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &blueobelisk, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &redobelisk, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//if the bot no longer wants to attack the obelisk
@@ -968,8 +968,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 		//if rushing to the base
 		if (bs->ltgtype == LTG_RUSHBASE) {
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &blueobelisk, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &redobelisk, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &blueobelisk, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &redobelisk, sizeof(bot_goal_t)); break;
 				default: BotGoHarvest(bs); return qfalse;
 			}
 			//if not carrying any cubes
@@ -1001,8 +1001,8 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 				bs->teammessage_time = 0;
 			}
 			switch(BotTeam(bs)) {
-				case TEAM_RED: memcpy(goal, &blueobelisk, sizeof(bot_goal_t)); break;
-				case TEAM_BLUE: memcpy(goal, &redobelisk, sizeof(bot_goal_t)); break;
+				case TEAM_RED: Com_Memcpy(goal, &blueobelisk, sizeof(bot_goal_t)); break;
+				case TEAM_BLUE: Com_Memcpy(goal, &redobelisk, sizeof(bot_goal_t)); break;
 				default: bs->ltgtype = 0; return qfalse;
 			}
 			//quit rushing after 2 minutes
@@ -1025,7 +1025,7 @@ int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) 
 				BotVoiceChatOnly(bs, -1, VOICECHAT_ONOFFENSE);
 				bs->teammessage_time = 0;
 			}
-			memcpy(goal, &neutralobelisk, sizeof(bot_goal_t));
+			Com_Memcpy(goal, &neutralobelisk, sizeof(bot_goal_t));
 			//
 			if (bs->teamgoal_time < FloatTime()) {
 				bs->ltgtype = 0;
@@ -1107,7 +1107,7 @@ int BotLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) {
 				bs->leadbackup_time = 0;
 			}
 			//the bot should go back to the team mate
-			memcpy(goal, &bs->lead_teamgoal, sizeof(bot_goal_t));
+			Com_Memcpy(goal, &bs->lead_teamgoal, sizeof(bot_goal_t));
 			return qtrue;
 		}
 		else {

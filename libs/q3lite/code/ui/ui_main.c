@@ -364,7 +364,7 @@ void Text_Paint(float x, float y, float scale, vec4_t color, const char *text, f
   if (text) {
     const char *s = text;
 		trap_R_SetColor( color );
-		memcpy(&newColor[0], &color[0], sizeof(vec4_t));
+		Com_Memcpy(&newColor[0], &color[0], sizeof(vec4_t));
     len = strlen(text);
 		if (limit > 0 && len > limit) {
 			len = limit;
@@ -375,7 +375,7 @@ void Text_Paint(float x, float y, float scale, vec4_t color, const char *text, f
       //int yadj = Assets.textFont.glyphs[text[i]].bottom + Assets.textFont.glyphs[text[i]].top;
       //float yadj = scale * (Assets.textFont.glyphs[text[i]].imageHeight - Assets.textFont.glyphs[text[i]].height);
 			if ( Q_IsColorString( s ) ) {
-				memcpy( newColor, g_color_table[ColorIndex(*(s+1))], sizeof( newColor ) );
+				Com_Memcpy( newColor, g_color_table[ColorIndex(*(s+1))], sizeof( newColor ) );
 				newColor[3] = color[3];
 				trap_R_SetColor( newColor );
 				s += 2;
@@ -433,7 +433,7 @@ void Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const cha
   if (text) {
     const char *s = text;
 		trap_R_SetColor( color );
-		memcpy(&newColor[0], &color[0], sizeof(vec4_t));
+		Com_Memcpy(&newColor[0], &color[0], sizeof(vec4_t));
     len = strlen(text);
 		if (limit > 0 && len > limit) {
 			len = limit;
@@ -445,7 +445,7 @@ void Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const cha
       //int yadj = Assets.textFont.glyphs[text[i]].bottom + Assets.textFont.glyphs[text[i]].top;
       //float yadj = scale * (Assets.textFont.glyphs[text[i]].imageHeight - Assets.textFont.glyphs[text[i]].height);
 			if ( Q_IsColorString( s ) ) {
-				memcpy( newColor, g_color_table[ColorIndex(*(s+1))], sizeof( newColor ) );
+				Com_Memcpy( newColor, g_color_table[ColorIndex(*(s+1))], sizeof( newColor ) );
 				newColor[3] = color[3];
 				trap_R_SetColor( newColor );
 				s += 2;
@@ -540,7 +540,7 @@ static void Text_Paint_Limit(float *maxX, float x, float y, float scale, vec4_t 
 		while (s && *s && count < len) {
 			glyph = &font->glyphs[*s & 255];
 			if ( Q_IsColorString( s ) ) {
-				memcpy( newColor, g_color_table[ColorIndex(*(s+1))], sizeof( newColor ) );
+				Com_Memcpy( newColor, g_color_table[ColorIndex(*(s+1))], sizeof( newColor ) );
 				newColor[3] = color[3];
 				trap_R_SetColor( newColor );
 				s += 2;

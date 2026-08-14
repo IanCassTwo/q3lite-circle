@@ -152,7 +152,7 @@ char	*ConcatArgs( int start ) {
 		if ( len + tlen >= MAX_STRING_CHARS - 1 ) {
 			break;
 		}
-		memcpy( line + len, arg, tlen );
+		Com_Memcpy( line + len, arg, tlen );
 		len += tlen;
 		if ( i != c - 1 ) {
 			line[len] = ' ';

@@ -251,7 +251,7 @@ static void SockadrToNetadr( struct sockaddr *s, netadr_t *a ) {
 	else if(s->sa_family == AF_INET6)
 	{
 		a->type = NA_IP6;
-		memcpy(a->ip6, &((struct sockaddr_in6 *)s)->sin6_addr, sizeof(a->ip6));
+		Com_Memcpy(a->ip6, &((struct sockaddr_in6 *)s)->sin6_addr, sizeof(a->ip6));
 		a->port = ((struct sockaddr_in6 *)s)->sin6_port;
 		a->scope_id = ((struct sockaddr_in6 *)s)->sin6_scope_id;
 	}
@@ -323,7 +323,7 @@ static qboolean Sys_StringToSockaddr(const char *s, struct sockaddr *sadr, int s
 			if(search->ai_addrlen > sadr_len)
 				search->ai_addrlen = sadr_len;
 				
-			memcpy(sadr, search->ai_addr, search->ai_addrlen);
+			Com_Memcpy(sadr, search->ai_addr, search->ai_addrlen);
 			freeaddrinfo(res);
 			
 			return qtrue;
@@ -676,7 +676,7 @@ void Sys_SendPacket( int length, const void *data, netadr_t to ) {
 		socksBuf[3] = 1;	// address type: IPV4
 		*(int *)&socksBuf[4] = ((struct sockaddr_in *)&addr)->sin_addr.s_addr;
 		*(short *)&socksBuf[8] = ((struct sockaddr_in *)&addr)->sin_port;
-		memcpy( &socksBuf[10], data, length );
+		Com_Memcpy( &socksBuf[10], data, length );
 		ret = sendto( ip_socket, socksBuf, length+10, 0, &socksRelayAddr, sizeof(socksRelayAddr) );
 	}
 	else {
@@ -983,7 +983,7 @@ void NET_SetMulticast6(void)
 		return;
 	}
 	
-	memcpy(&curgroup.ipv6mr_multiaddr, &addr.sin6_addr, sizeof(curgroup.ipv6mr_multiaddr));
+	Com_Memcpy(&curgroup.ipv6mr_multiaddr, &addr.sin6_addr, sizeof(curgroup.ipv6mr_multiaddr));
 
 	if(*net_mcast6iface->string)
 	{
@@ -1164,11 +1164,11 @@ void NET_OpenSocks( int port ) {
 		buf[0] = 1;		// username/password authentication version
 		buf[1] = ulen;
 		if ( ulen ) {
-			memcpy( &buf[2], net_socksUsername->string, ulen );
+			Com_Memcpy( &buf[2], net_socksUsername->string, ulen );
 		}
 		buf[2 + ulen] = plen;
 		if ( plen ) {
-			memcpy( &buf[3 + ulen], net_socksPassword->string, plen );
+			Com_Memcpy( &buf[3 + ulen], net_socksPassword->string, plen );
 		}
 
 		// send it
@@ -1268,8 +1268,8 @@ static void NET_AddLocalAddress(char *ifname, struct sockaddr *addr, struct sock
 	
 		localIP[numIP].family = family;
 
-		memcpy(&localIP[numIP].addr, addr, addrlen);
-		memcpy(&localIP[numIP].netmask, netmask, addrlen);
+		Com_Memcpy(&localIP[numIP].addr, addr, addrlen);
+		Com_Memcpy(&localIP[numIP].netmask, netmask, addrlen);
 		
 		numIP++;
 	}

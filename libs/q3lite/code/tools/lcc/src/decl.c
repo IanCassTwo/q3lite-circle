@@ -671,7 +671,7 @@ static void funcdefn(int sclass, char *id, Type ty, Symbol params[], Coordinate 
 			warning("old-style function definition for `%s'\n", id);
 		caller = params;
 		callee = newarray(n + 1, sizeof *callee, FUNC);
-		memcpy(callee, caller, (n+1)*sizeof *callee);
+		Com_Memcpy(callee, caller, (n+1)*sizeof *callee);
 		enterscope();
 		assert(level == PARAM);
 		while (kind[t] == STATIC || istypename(t, tsym))
@@ -790,12 +790,12 @@ static void funcdefn(int sclass, char *id, Type ty, Symbol params[], Coordinate 
 		Symbol *a;
 		a = newarray(n + 2, sizeof *a, FUNC);
 		a[0] = retv;
-		memcpy(&a[1], callee, (n+1)*sizeof *callee);
+		Com_Memcpy(&a[1], callee, (n+1)*sizeof *callee);
 		callee = a;
 		a = newarray(n + 2, sizeof *a, FUNC);
 		NEW(a[0], FUNC);
 		*a[0] = *retv;
-		memcpy(&a[1], caller, (n+1)*sizeof *callee);
+		Com_Memcpy(&a[1], caller, (n+1)*sizeof *callee);
 		caller = a;
 	}
 	if (!IR->wants_argb)

@@ -42,11 +42,19 @@ Suite 120, Rockville, Maryland 20850 USA.
 #include <unordered_map>
 #include <string>
 #include <ctype.h>
+#include <stddef.h>
+
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+  #include <arm_neon.h>
+#endif
+
 
 // Circle C++ headers MUST stay outside extern "C"
 #include <circle/bcmrandom.h>
 #include <circle/sched/scheduler.h>
 #include <circle/timer.h>
+#include <profile/profiler.h>
+#include "kernel.h"
 
 // Declarations for GNU Linker Symbol Wrapping
 extern "C" {
@@ -128,11 +136,66 @@ static bool IsPK3File( const char *path ) {
              tolower( (unsigned char)ext[3] ) == '3' );
 }
 
+CProfiler *Profiler;
+
 extern "C" {
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "sys_local.h"
+
+
+extern "C" void *Sys_Memcpy(void * __restrict dest, const void * __restrict src, size_t n) {
+    if (!n || dest == src) return dest;
+
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    unsigned char *d = (unsigned char *)dest;
+    const unsigned char *s = (const unsigned char *)src;
+
+    // Use NEON vectorization for larger copies (>= 64 bytes)
+    if (n >= 64) {
+        __builtin_prefetch(s + 64, 0, 0);
+
+        while (n >= 64) {
+            if (n >= 128) __builtin_prefetch(s + 128, 0, 0);
+
+            uint8x16_t v0 = vld1q_u8(s);
+            uint8x16_t v1 = vld1q_u8(s + 16);
+            uint8x16_t v2 = vld1q_u8(s + 32);
+            uint8x16_t v3 = vld1q_u8(s + 48);
+
+            vst1q_u8(d, v0);
+            vst1q_u8(d + 16, v1);
+            vst1q_u8(d + 32, v2);
+            vst1q_u8(d + 48, v3);
+
+            s += 64;
+            d += 64;
+            n -= 64;
+        }
+    }
+
+    // Process remaining 16-byte blocks
+    while (n >= 16) {
+        uint8x16_t v = vld1q_u8(s);
+        vst1q_u8(d, v);
+        s += 16;
+        d += 16;
+        n -= 16;
+    }
+
+    // NEON tail cleanup for remaining < 16 bytes
+    while (n > 0) {
+        *d++ = *s++;
+        n--;
+    }
+
+    return dest;
+#else
+    // Non-NEON fallback: Hand off to the optimized standard library memcpy!
+    return memcpy(dest, src, n);
+#endif
+}
 
 /*
 ==================
@@ -150,25 +213,31 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
         clean_path++;
     }
 
-    // Attempt to open standard file from disk using real C library symbol
+    const bool is_read_mode = ( mode[0] == 'r' );
+	const bool is_pk3 = is_read_mode && IsPK3File(clean_path);
+
+    // Check RAM cache FIRST before touching the disk
+    if ( is_pk3 ) {
+        std::string key( clean_path );
+
+        // Cache HIT: Return RAM-backed FILE* cookie without opening a disk handle
+        auto it = g_ramCache.find( key );
+        if ( it != g_ramCache.end() ) {
+            RamCookie *rc = new RamCookie{ it->second.data, it->second.size, 0 };
+            return fopencookie( rc, "rb", ram_funcs );
+        }
+    }
+
+    // Cache MISS: Attempt to open standard file from disk using real C library symbol
     FILE *disk_f = __real_fopen( clean_path, mode );
     if ( !disk_f ) {
         return NULL;
     }
 
-    // Intercept read operations for .pk3 archives
-    if ( ( mode[0] == 'r' || mode[0] == 'b' ) && IsPK3File( clean_path ) ) {
+    // Intercept read operations for .pk3 archives to populate cache
+    if ( is_pk3 ) {
         std::string key( clean_path );
 
-        // Cache HIT: Return RAM-backed FILE* cookie
-        auto it = g_ramCache.find( key );
-        if ( it != g_ramCache.end() ) {
-            __real_fclose( disk_f );
-            RamCookie *rc = new RamCookie{ it->second.data, it->second.size, 0 };
-            return fopencookie( rc, "rb", ram_funcs );
-        }
-
-        // Cache MISS: Load .pk3 file contents into RAM
         fseek( disk_f, 0, SEEK_END );
         long file_size = ftell( disk_f );
         
@@ -183,27 +252,32 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
                 setvbuf( disk_f, NULL, _IOFBF, 1024 * 1024 );
 
                 // Read in large blocks to prevent C-library / FAT overhead
-                constexpr size_t BLOCK_SIZE = 1024 * 1024; // 1MB block size
+                constexpr size_t BLOCK_SIZE = 32 * 1024; 
                 size_t total_bytes_read = 0;
                 bool read_error = false;
 
+                Com_Printf( "Please wait: Loading %s", clean_path );
                 while ( total_bytes_read < (size_t)file_size ) {
                     size_t bytes_to_read = BLOCK_SIZE;
                     if ( total_bytes_read + bytes_to_read > (size_t)file_size ) {
                         bytes_to_read = (size_t)file_size - total_bytes_read;
                     }
 
-                    size_t read_count = fread( cached_data + total_bytes_read, 1, bytes_to_read, disk_f );
-                    total_bytes_read += read_count;
-
-                    // Handle early EOF or disk read errors
-                    if ( read_count == 0 && ferror( disk_f ) ) {
-                        read_error = true;
-                        break;
-                    }
-					if ( total_bytes_read % (10 * BLOCK_SIZE) < BLOCK_SIZE ) {
-							CScheduler::Get()->Yield();
+                    size_t read_count = fread( cached_data + total_bytes_read, 1, bytes_to_read, disk_f );                    
+					
+					// Did we get what we asked for?
+					if (read_count != bytes_to_read) {
+						read_error = true;
+						break;
 					}
+
+					total_bytes_read += read_count;
+
+
+                    // yield to prevent long blocking reads from stalling other tasks
+					// such as the network thread or the scheduler itself
+                    CScheduler::Get()->Yield();
+ 
                 }
 
                 if ( !read_error && total_bytes_read == (size_t)file_size ) {
@@ -223,7 +297,7 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
     }
 
     // Default stream buffer for non-PK3 disk handles or un-cached PK3 fallbacks
-    if ( mode[0] == 'r' || mode[0] == 'b' ) {
+    if ( is_read_mode ) {
         setvbuf( disk_f, NULL, _IOFBF, 64 * 1024 );
     }
     return disk_f;
@@ -300,9 +374,27 @@ char *Sys_GogPath( void )
 Sys_Milliseconds
 ================
 */
-int Sys_Milliseconds (void)
-{
-	return (int)(CTimer::GetClockTicks() / 1000);
+int Sys_Milliseconds( void ) {
+    static uint64_t start_ticks = 0;
+	static uint64_t last_yield_ticks = 0;
+
+    uint64_t current_ticks = CTimer::GetClockTicks64();
+
+    if ( start_ticks == 0 ) {
+        // CTimer::GetClockTicks64() returns microseconds as 64-bit unsigned (never wraps in our lifetime)
+        start_ticks = current_ticks;
+		last_yield_ticks = current_ticks;
+    }
+
+	// Rate-limit scheduler yields: Only yield if at least 1.5ms (1500 us) 
+    // have elapsed since the last background task slice.
+    if ( current_ticks - last_yield_ticks >= 100 ) {
+        last_yield_ticks = current_ticks;
+        CScheduler::Get()->Yield();
+    }
+
+    // Calculate elapsed milliseconds relative to system start
+    return (int)( ( current_ticks - start_ticks ) / 1000 );
 }
 
 // Fast xorshift32 PRNG
@@ -700,7 +792,7 @@ void Sys_Sleep( int msec )
 
     if ( msec == 0 )
     {
-        //CScheduler::Get()->Yield();
+        CScheduler::Get()->Yield();
         return;
     }
 
@@ -849,14 +941,30 @@ void Sys_PlatformInit( void )
 {
 	Sys_SetFloatEnv();
 	stdinIsATTY = qfalse;
+	Com_Printf( "Sys_PlatformInit");
 }
 
-void Sys_PlatformExit( void ) {}
+void Sys_PlatformExit( void ) {
+	Com_Printf( "Sys_PlatformExit");
+}
+
 void Sys_SetEnv(const char *name, const char *value) {}
 
 int Sys_PID( void )
 {
 	return 1;
+}
+
+void Sys_StartProfiler( void )
+{
+	Profiler = new CProfiler();
+}	
+
+void Sys_StopProfiler( void )
+{
+	Profiler->SaveResults (CKernel::Get()->GetRootFilesystem(), "0:");
+	delete Profiler;
+	Profiler = nullptr;
 }
 
 qboolean Sys_PIDIsRunning( int pid )

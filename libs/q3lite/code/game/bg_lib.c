@@ -330,7 +330,7 @@ void *memset( void *dest, int c, size_t count ) {
 	return dest;
 }
 
-void *memcpy( void *dest, const void *src, size_t count ) {
+void *Com_Memcpy( void *dest, const void *src, size_t count ) {
 	while ( count-- ) {
 		((char *)dest)[count] = ((char *)src)[count];
 	}

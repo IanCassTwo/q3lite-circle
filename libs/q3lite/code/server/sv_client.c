@@ -841,7 +841,7 @@ void SV_ClientEnterWorld( client_t *client, usercmd_t *cmd ) {
 	client->lastSnapshotTime = 0;	// generate a snapshot immediately
 
 	if(cmd)
-		memcpy(&client->lastUsercmd, cmd, sizeof(client->lastUsercmd));
+		Com_Memcpy(&client->lastUsercmd, cmd, sizeof(client->lastUsercmd));
 	else
 		memset(&client->lastUsercmd, '\0', sizeof(client->lastUsercmd));
 
@@ -1987,7 +1987,7 @@ void SV_UserVoip(client_t *cl, msg_t *msg, qboolean ignoreData)
 		packet->generation = generation;
 		packet->sequence = sequence;
 		packet->flags = flags;
-		memcpy(packet->data, encoded, packetsize);
+		Com_Memcpy(packet->data, encoded, packetsize);
 
 		client->voipPacket[(client->queuedVoipIndex + client->queuedVoipPackets) % ARRAY_LEN(client->voipPacket)] = packet;
 		client->queuedVoipPackets++;

@@ -1129,8 +1129,8 @@ void Menu_TransitionItemByName(menuDef_t *menu, const char *p, rectDef_t rectFro
     if (item != NULL) {
       item->window.flags |= (WINDOW_INTRANSITION | WINDOW_VISIBLE);
       item->window.offsetTime = time;
-			memcpy(&item->window.rectClient, &rectFrom, sizeof(rectDef_t));
-			memcpy(&item->window.rectEffects, &rectTo, sizeof(rectDef_t));
+			Com_Memcpy(&item->window.rectClient, &rectFrom, sizeof(rectDef_t));
+			Com_Memcpy(&item->window.rectEffects, &rectTo, sizeof(rectDef_t));
 			item->window.rectEffects2.x = fabs(rectTo.x - rectFrom.x) / amt;
 			item->window.rectEffects2.y = fabs(rectTo.y - rectFrom.y) / amt;
 			item->window.rectEffects2.w = fabs(rectTo.w - rectFrom.w) / amt;
@@ -2900,13 +2900,13 @@ void Item_TextColor(itemDef_t *item, vec4_t *newColor) {
 		lowLight[3] = 0.8 * item->window.foreColor[3]; 
 		LerpColor(item->window.foreColor,lowLight,*newColor,0.5+0.5*sin(DC->realTime / PULSE_DIVISOR));
 	} else {
-		memcpy(newColor, &item->window.foreColor, sizeof(vec4_t));
+		Com_Memcpy(newColor, &item->window.foreColor, sizeof(vec4_t));
 		// items can be enabled and disabled based on cvars
 	}
 
 	if (item->enableCvar && *item->enableCvar && item->cvarTest && *item->cvarTest) {
 		if (item->cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) && !Item_EnableShowViaCvar(item, CVAR_ENABLE)) {
-			memcpy(newColor, &parent->disableColor, sizeof(vec4_t));
+			Com_Memcpy(newColor, &parent->disableColor, sizeof(vec4_t));
 		}
 	}
 }
@@ -3126,7 +3126,7 @@ void Item_TextField_Paint(itemDef_t *item) {
 		lowLight[3] = 0.8 * parent->focusColor[3]; 
 		LerpColor(parent->focusColor,lowLight,newColor,0.5+0.5*sin(DC->realTime / PULSE_DIVISOR));
 	} else {
-		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
+		Com_Memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
 
 	offset = (item->text && *item->text) ? 8 : 0;
@@ -3153,7 +3153,7 @@ void Item_YesNo_Paint(itemDef_t *item) {
 		lowLight[3] = 0.8 * parent->focusColor[3]; 
 		LerpColor(parent->focusColor,lowLight,newColor,0.5+0.5*sin(DC->realTime / PULSE_DIVISOR));
 	} else {
-		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
+		Com_Memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
 
 	if (item->text) {
@@ -3176,7 +3176,7 @@ void Item_Multi_Paint(itemDef_t *item) {
 		lowLight[3] = 0.8 * parent->focusColor[3]; 
 		LerpColor(parent->focusColor,lowLight,newColor,0.5+0.5*sin(DC->realTime / PULSE_DIVISOR));
 	} else {
-		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
+		Com_Memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
 
 	text = Item_Multi_Setting(item);
@@ -3466,7 +3466,7 @@ void Item_Slider_Paint(itemDef_t *item) {
 		lowLight[3] = 0.8 * parent->focusColor[3]; 
 		LerpColor(parent->focusColor,lowLight,newColor,0.5+0.5*sin(DC->realTime / PULSE_DIVISOR));
 	} else {
-		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
+		Com_Memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
 
 	y = item->window.rect.y;
@@ -3506,7 +3506,7 @@ void Item_Bind_Paint(itemDef_t *item) {
 		}
 		LerpColor(parent->focusColor,lowLight,newColor,0.5+0.5*sin(DC->realTime / PULSE_DIVISOR));
 	} else {
-		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
+		Com_Memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
 
 	if (item->text) {
@@ -3888,14 +3888,14 @@ void Item_OwnerDraw_Paint(itemDef_t *item) {
 		vec4_t color, lowLight;
 		menuDef_t *parent = (menuDef_t*)item->parent;
 		Fade(&item->window.flags, &item->window.foreColor[3], parent->fadeClamp, &item->window.nextTime, parent->fadeCycle, qtrue, parent->fadeAmount);
-		memcpy(&color, &item->window.foreColor, sizeof(color));
+		Com_Memcpy(&color, &item->window.foreColor, sizeof(color));
 		if (item->numColors > 0 && DC->getValue) {
 			// if the value is within one of the ranges then set color to that, otherwise leave at default
 			int i;
 			float f = DC->getValue(item->window.ownerDraw);
 			for (i = 0; i < item->numColors; i++) {
 				if (f >= item->colorRanges[i].low && f <= item->colorRanges[i].high) {
-					memcpy(&color, &item->colorRanges[i].color, sizeof(color));
+					Com_Memcpy(&color, &item->colorRanges[i].color, sizeof(color));
 					break;
 				}
 			}
@@ -5102,7 +5102,7 @@ qboolean ItemParse_addColorRange( itemDef_t *item, int handle ) {
 		PC_Float_Parse(handle, &color.high) &&
 		PC_Color_Parse(handle, &color.color) ) {
 		if (item->numColors < MAX_COLOR_RANGES) {
-			memcpy(&item->colorRanges[item->numColors], &color, sizeof(color));
+			Com_Memcpy(&item->colorRanges[item->numColors], &color, sizeof(color));
 			item->numColors++;
 		}
 		return qtrue;

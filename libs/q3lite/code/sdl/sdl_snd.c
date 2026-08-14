@@ -90,12 +90,12 @@ static void SNDDMA_AudioCallback(void *userdata, Uint8 *stream, int len)
 			len1 = tobufend;
 			len2 = len - len1;
 		}
-		memcpy(stream, dma.buffer + pos, len1);
+		Com_Memcpy(stream, dma.buffer + pos, len1);
 		if (len2 <= 0)
 			dmapos += (len1 / (dma.samplebits/8));
 		else  /* wraparound? */
 		{
-			memcpy(stream+len1, dma.buffer, len2);
+			Com_Memcpy(stream+len1, dma.buffer, len2);
 			dmapos = (len2 / (dma.samplebits/8));
 		}
 	}

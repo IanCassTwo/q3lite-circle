@@ -69,7 +69,7 @@ void MField_Draw( mfield_t *edit, int x, int y, int style, vec4_t color ) {
 	if ( drawLen >= MAX_STRING_CHARS ) {
 		trap_Error( "drawLen >= MAX_STRING_CHARS" );
 	}
-	memcpy( str, edit->buffer + prestep, drawLen );
+	Com_Memcpy( str, edit->buffer + prestep, drawLen );
 	str[ drawLen ] = 0;
 
 	UI_DrawString( x, y, str, style, color );

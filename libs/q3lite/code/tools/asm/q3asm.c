@@ -673,7 +673,7 @@ static char *ExtractLine( char *data ) {
 		return data;
 	}
 
-	memcpy( lineBuffer, data, (p - data) );
+	Com_Memcpy( lineBuffer, data, (p - data) );
 	lineBuffer[(p - data)] = 0;
 	p += (*p == '\n') ? 1 : 0;  /* Skip over final newline. */
 	return p;
@@ -747,7 +747,7 @@ static int ParseExpression(void) {
 		}
 	}
 
-	memcpy( sym, token, i );
+	Com_Memcpy( sym, token, i );
 	sym[i] = 0;
 
 	switch (*sym) {  /* Resolve depending on first character. */
@@ -770,7 +770,7 @@ static int ParseExpression(void) {
 			}
 		}
 
-		memcpy( sym, token+i+1, j-i-1 );
+		Com_Memcpy( sym, token+i+1, j-i-1 );
 		sym[j-i-1] = 0;
 
 		switch (token[i]) {

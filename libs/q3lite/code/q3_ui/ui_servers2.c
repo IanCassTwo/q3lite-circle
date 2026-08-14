@@ -615,7 +615,7 @@ static void ArenaServers_Remove( void )
 			if (i < g_arenaservers.numfavoriteaddresses-1)
 			{
 				// shift items up
-				memcpy( &g_arenaservers.favoriteaddresses[i], &g_arenaservers.favoriteaddresses[i+1], (g_arenaservers.numfavoriteaddresses - i - 1)* MAX_ADDRESSLENGTH );
+				Com_Memcpy( &g_arenaservers.favoriteaddresses[i], &g_arenaservers.favoriteaddresses[i+1], (g_arenaservers.numfavoriteaddresses - i - 1)* MAX_ADDRESSLENGTH );
 			}
 			g_arenaservers.numfavoriteaddresses--;
 			memset( &g_arenaservers.favoriteaddresses[g_arenaservers.numfavoriteaddresses], 0, MAX_ADDRESSLENGTH );
@@ -633,7 +633,7 @@ static void ArenaServers_Remove( void )
 			if (i < g_numfavoriteservers-1)
 			{
 				// shift items up
-				memcpy( &g_favoriteserverlist[i], &g_favoriteserverlist[i+1], (g_numfavoriteservers - i - 1)*sizeof(servernode_t));
+				Com_Memcpy( &g_favoriteserverlist[i], &g_favoriteserverlist[i+1], (g_numfavoriteservers - i - 1)*sizeof(servernode_t));
 			}
 			g_numfavoriteservers--;
 			memset( &g_favoriteserverlist[ g_numfavoriteservers ], 0, sizeof(servernode_t));
@@ -749,7 +749,7 @@ void ArenaServers_LoadFavorites( void )
 	found        = qfalse;
 
 	// copy the old
-	memcpy( templist, g_favoriteserverlist, sizeof(servernode_t)*MAX_FAVORITESERVERS );
+	Com_Memcpy( templist, g_favoriteserverlist, sizeof(servernode_t)*MAX_FAVORITESERVERS );
 	numtempitems = g_numfavoriteservers;
 
 	// clear the current for sync
@@ -776,7 +776,7 @@ void ArenaServers_LoadFavorites( void )
 		if (j < numtempitems)
 		{
 			// found server - add exisiting results
-			memcpy( &g_favoriteserverlist[g_numfavoriteservers], &templist[j], sizeof(servernode_t) );
+			Com_Memcpy( &g_favoriteserverlist[g_numfavoriteservers], &templist[j], sizeof(servernode_t) );
 			found = qtrue;
 		}
 		else

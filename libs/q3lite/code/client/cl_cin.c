@@ -339,7 +339,7 @@ static void move8_32( byte *src, byte *dst, int spl )
 
 	for(i = 0; i < 8; ++i)
 	{
-		memcpy(dst, src, 32);
+		Com_Memcpy(dst, src, 32);
 		src += spl;
 		dst += spl;
 	}
@@ -359,7 +359,7 @@ static void move4_32( byte *src, byte *dst, int spl  )
 
 	for(i = 0; i < 4; ++i)
 	{
-		memcpy(dst, src, 16);
+		Com_Memcpy(dst, src, 16);
 		src += spl;
 		dst += spl;
 	}
@@ -379,7 +379,7 @@ static void blit8_32( byte *src, byte *dst, int spl  )
 
 	for(i = 0; i < 8; ++i)
 	{
-		memcpy(dst, src, 32);
+		Com_Memcpy(dst, src, 32);
 		src += 32;
 		dst += spl;
 	}
@@ -414,8 +414,8 @@ static void blit4_32( byte *src, byte *dst, int spl  )
 
 static void blit2_32( byte *src, byte *dst, int spl  )
 {
-	memcpy(dst, src, 8);
-	memcpy(dst+spl, src+8, 8);
+	Com_Memcpy(dst, src, 8);
+	Com_Memcpy(dst+spl, src+8, 8);
 }
 
 /******************************************************************************

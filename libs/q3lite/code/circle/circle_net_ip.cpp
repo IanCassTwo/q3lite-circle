@@ -250,7 +250,8 @@ void Sys_SendPacket( int length, const void *data, netadr_t to ) {
 
     u16 destPort = ntohs(to.port);
 
-    g_pUDPSocket->SendTo(data, length, 0, destIP, destPort);
+    g_pUDPSocket->SendTo(data, length, MSG_DONTWAIT, destIP, destPort);
+
 }
 
 /*
@@ -315,12 +316,15 @@ void NET_OpenIP( void ) {
         return;
     }
 
+    // TODO I don't think we need to bind to the port for UDP
+    /*
     if (g_pUDPSocket->Bind(port) < 0) {
         Com_Printf("WARNING: NET_OpenIP: Couldn't bind to port %i\n", port);
         delete g_pUDPSocket;
         g_pUDPSocket = nullptr;
         return;
     }
+    */
 
     Com_Printf("Network is enabled");
     //CScheduler::Get()->Yield();
@@ -430,17 +434,28 @@ void NET_Shutdown( void ) {
 NET_Event
 ====================
 */
-void NET_Event( void ) {
+qboolean NET_Event( void ) {
     byte bufData[ MAX_MSGLEN_BUF ];
     netadr_t from;
     msg_t netmsg;
 
-    NET_CheckDeferredInit();
+    qboolean packetReceived = qfalse;
+    //int count = 0;
+
+    // Force Circle's network stack to pull pending RX hardware packets
+    // into the socket queues immediately before we check for packets
+    /*
+    if ( g_pNetSubsystem ) {
+        g_pNetSubsystem->Process();
+    }
+    */
 
     while ( 1 ) {
         MSG_Init( &netmsg, bufData, MAX_MSGLEN );
 
         if ( NET_GetPacket( &from, &netmsg, NULL ) ) {
+            packetReceived = qtrue;
+            //count++;
             if ( net_dropsim->value > 0.0f && net_dropsim->value <= 100.0f ) {
                 if ( rand() < (int) (((double) RAND_MAX) / 100.0 * (double) net_dropsim->value) )
                     continue; 
@@ -454,6 +469,12 @@ void NET_Event( void ) {
             break;
         }
     }
+
+    //if ( count > 1 ) {
+    //    Com_Printf( "NET_Event: Drained %d packets at once!\n", count );
+    //}
+
+    return packetReceived;
 }
 
 /*
@@ -462,21 +483,29 @@ NET_Sleep
 ====================
 */
 void NET_Sleep(int msec) {
+
+    int start = Sys_Milliseconds();
+
     if (msec < 0) {
-        return;
+        msec = 0;
     }
 
-    // Pump packets immediately before sleeping
-    NET_Event();
+    NET_CheckDeferredInit();
 
-    // If we are just yielding time, give Circle's scheduler a single slice
-    if (msec > 0) {
-        // Yield allows Circle's background tasks (Wi-Fi driver, network stack) to run
-        CScheduler::Get()->Yield(); 
-        
-        // Pump again in case Circle's network tasks queued a packet during the yield
-        NET_Event();
-    }}
+    while ( 1 ) {
+        if (NET_Event()) {
+            return;
+        }
+
+        //CScheduler::Get()->Yield();
+
+        // Check if our sleep duration has expired
+        if ( msec == 0 || ( Sys_Milliseconds() - start ) >= msec ) {
+            return;
+        }
+
+    }
+}
 
 /*
 ====================

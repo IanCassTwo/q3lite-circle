@@ -181,8 +181,8 @@ void BotVoiceChat_Defend(bot_state_t *bs, int client, int mode) {
 	if ( gametype == GT_OBELISK || gametype == GT_HARVESTER) {
 		//
 		switch(BotTeam(bs)) {
-			case TEAM_RED: memcpy(&bs->teamgoal, &redobelisk, sizeof(bot_goal_t)); break;
-			case TEAM_BLUE: memcpy(&bs->teamgoal, &blueobelisk, sizeof(bot_goal_t)); break;
+			case TEAM_RED: Com_Memcpy(&bs->teamgoal, &redobelisk, sizeof(bot_goal_t)); break;
+			case TEAM_BLUE: Com_Memcpy(&bs->teamgoal, &blueobelisk, sizeof(bot_goal_t)); break;
 			default: return;
 		}
 	}
@@ -195,8 +195,8 @@ void BotVoiceChat_Defend(bot_state_t *bs, int client, int mode) {
 			) {
 		//
 		switch(BotTeam(bs)) {
-			case TEAM_RED: memcpy(&bs->teamgoal, &ctf_redflag, sizeof(bot_goal_t)); break;
-			case TEAM_BLUE: memcpy(&bs->teamgoal, &ctf_blueflag, sizeof(bot_goal_t)); break;
+			case TEAM_RED: Com_Memcpy(&bs->teamgoal, &ctf_redflag, sizeof(bot_goal_t)); break;
+			case TEAM_BLUE: Com_Memcpy(&bs->teamgoal, &ctf_blueflag, sizeof(bot_goal_t)); break;
 			default: return;
 		}
 	}

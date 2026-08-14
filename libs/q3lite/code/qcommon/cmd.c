@@ -30,6 +30,7 @@ Suite 120, Rockville, Maryland 20850 USA.
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "sys_local.h"
 
 #define	MAX_CMD_BUFFER  128*1024
 #define	MAX_CMD_LINE	1024
@@ -874,5 +875,11 @@ void Cmd_Init (void) {
 	Cmd_SetCommandCompletionFunc( "vstr", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("echo",Cmd_Echo_f);
 	Cmd_AddCommand ("wait", Cmd_Wait_f);
+
+	// add commands to start and stop the profiler
+	// Note these are intended to be run only once per session and there's
+	// no guard against running them multiple times, so don't do that!
+	Cmd_AddCommand ("profile_start", Sys_StartProfiler);
+	Cmd_AddCommand ("profile_stop", Sys_StopProfiler);
 }
 

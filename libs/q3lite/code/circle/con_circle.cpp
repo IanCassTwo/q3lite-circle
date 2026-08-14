@@ -76,10 +76,22 @@ void CON_Print( const char *msg )
     fflush(stdout);
 }
 */
+/*
 void CON_Print( const char *msg )
 {
     if (CLogger::Get()) {
-        CLogger::Get()->Write("Q3", LogNotice, "%s", msg);
+        CLogger::Get()->Write("quake3", LogNotice, "%s", msg);
+    }
+}
+*/
+void CON_Print(const char *msg)
+{
+    if (CLogger::Get()) {
+        CString clean(msg);
+        clean.Replace("\n", "");
+        clean.Replace("\r", "");
+
+        CLogger::Get()->Write("quake3", LogNotice, "%s", clean.c_str());
     }
 }
 }
