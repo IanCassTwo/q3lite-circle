@@ -5,30 +5,29 @@ This project combines the Quake III Arena lightweight engine (q3lite) with the b
 
 ## Status
 
-🚧 **Feature complete**
+**Feature complete**
 
 The project currently:
 
 * ✅ Boots and runs on Raspberry Pi 2 or 3 hardware
-* ✅ Hardware Accelerated OpenGLES1.1 with Vidcore
-* ✅ Keyboard and mouse input working
+* ✅ Hardware Accelerated OpenGLES1.1
+* ✅ Keyboard and mouse working
 * ✅ Sound working via HDMI
 * ✅ JIT Compiler for QVM (working with caveats)
-* ✅ Networking working
+* ✅ Networking working (only on Pi 3)
 
-The current focus is bringing up the remaining platform functionality required for a complete playable experience.
+The project is now feature complete with first round of performance improvements. Currently I get over 50fps using vertex lighting, or 40fps using lightmaps
 
 ## Supported hardware
 The project has been tested on:
 
 * Raspberry Pi 2 (32-bit) but does not have wifi, so no networking
-* Raspberry Pi 2 (32-bit)
+* Raspberry Pi 3 (32-bit)
 
-Raspberry Pi 4 and 5 are not supported because VCHIQ driver does not support these models
+Raspberry Pi 4 and 5 are not supported unfortunately because VCHIQ driver does not support these models
 
 ## Architecture
 Unlike traditional Raspberry Pi software running under Linux, this project runs directly on the hardware:
-
 
 Raspberry Pi Hardware
         |
@@ -38,8 +37,7 @@ RSTA2 Circle-stdlib
         v
 q3lite engine
 
-
-Circle provides the low-level platform support required for booting, hardware access, graphics, and device management, while q3lite provides the game engine layer.
+Circle provides the low-level platform support required for booting, hardware access, graphics, networking, and device management, while q3lite provides the game engine layer.
 
 ## Goals
 The main goals of this project are:
