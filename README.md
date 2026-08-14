@@ -1,5 +1,5 @@
 # q3lite on Raspberry Pi bare metal
-A work-in-progress port of **q3lite** running directly on Raspberry Pi hardware without an operating system.
+A port of **q3lite** running directly on Raspberry Pi hardware without an operating system.
 
 This project combines the Quake III Arena lightweight engine (q3lite) with the bare-metal capabilities of **Raspberry Pi** provided by **RSTA2 Circle** and **circle-stdlib**. The goal is to bring a classic 3D game engine experience to the Raspberry Pi platform while running entirely from bare metal.
 
@@ -24,7 +24,7 @@ The project has been tested on:
 * Raspberry Pi 2 (32-bit) but does not have wifi, so no networking
 * Raspberry Pi 3 (32-bit)
 
-Raspberry Pi 4 and 5 are not supported unfortunately because VCHIQ driver does not support these models
+Raspberry Pi 2W will likely work fine. Raspberry Pi 4 and 5 are not supported unfortunately because VCHIQ driver does not support these models
 
 ## Architecture
 Unlike traditional Raspberry Pi software running under Linux, this project runs directly on the hardware:
