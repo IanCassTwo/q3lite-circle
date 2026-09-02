@@ -198,10 +198,6 @@ boolean CKernel::Initialize (void)
 		}
 
 		bOK = m_Logger.Initialize (pTarget);
-		LOGNOTE("====== Welcome to q3Lite ======");
-		LOGNOTE("Compile time: " __DATE__ " " __TIME__);
-		LOGNOTE("Memory Size: %u", CMemorySystem::Get()->GetMemSize());
-		LOGNOTE("===============================");
 	}
 
 	if (bOK)
@@ -295,11 +291,20 @@ boolean CKernel::Initialize (void)
 		}
 	}
 
+	// Set CPU speed
+	//CCPUThrottle::Get()->SetSpeed(CPUSpeedMaximum);
+
 	return bOK;
 }
 
 TShutdownMode CKernel::Run (void)
 {
+
+	LOGNOTE("====== Welcome to q3Lite ======");
+	LOGNOTE("Compile time: " __DATE__ " " __TIME__);
+	LOGNOTE("Memory Size: %u", CMemorySystem::Get()->GetMemSize());
+	LOGNOTE("CPU Speed %u", CCPUThrottle::Get()->GetClockRate());
+	LOGNOTE("===============================");
 
 	// Search for USB devices
 	boolean bUpdated = m_USBHCI.UpdatePlugAndPlay ();

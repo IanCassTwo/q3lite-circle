@@ -43,6 +43,7 @@
 #include <circle/sound/pwmsoundbasedevice.h>
 #include <circle/net/netsubsystem.h>
 #include <wlan/hostap/wpa_supplicant/wpasupplicant.h>
+#include <circle/cputhrottle.h>
 #include <wlan/bcm4343.h>
 
 enum TShutdownMode
@@ -95,6 +96,7 @@ private:
 	CUSBKeyboardDevice * volatile m_pKeyboard;
 	CMouseDevice * volatile m_pMouse;
 	CSoundBaseDevice	*m_pHDMISound;
+	CCPUThrottle            m_CPUThrottle;
 	static CKernel *s_pThis;
 	boolean m_bNetworkAvailable;
 };

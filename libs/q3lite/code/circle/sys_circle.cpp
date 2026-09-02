@@ -43,6 +43,7 @@ Suite 120, Rockville, Maryland 20850 USA.
 #include <string>
 #include <ctype.h>
 #include <stddef.h>
+#include <circle/memory.h>
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
   #include <arm_neon.h>
@@ -69,6 +70,10 @@ struct CachedFile {
     char *data;
     size_t size;
 };
+
+// Minimum free heap RAM to leave untouched for engine/video/game state
+constexpr size_t MIN_RAM_CUSHION        = 128 * 1024 * 1024; // 128 MB reserve
+
 
 // Global cache table mapping path -> file buffer
 static std::unordered_map<std::string, CachedFile> g_ramCache;
@@ -202,7 +207,7 @@ extern "C" void *Sys_Memcpy(void * __restrict dest, const void * __restrict src,
 __wrap_fopen
 ==================
 Intercepts standard calls to fopen() at link time.
-Handles path normalization, missing-file checks, and .pk3 RAM-caching.
+Handles path normalization, missing-file checks, and memory-safe .pk3 RAM caching.
 */
 FILE *__wrap_fopen( const char *path, const char *mode ) {
     if ( !path ) return NULL;
@@ -214,92 +219,104 @@ FILE *__wrap_fopen( const char *path, const char *mode ) {
     }
 
     const bool is_read_mode = ( mode[0] == 'r' );
-	const bool is_pk3 = is_read_mode && IsPK3File(clean_path);
+    const bool is_pk3 = is_read_mode && IsPK3File( clean_path );
 
-    // Check RAM cache FIRST before touching the disk
+    // Check RAM cache FIRST before touching disk
     if ( is_pk3 ) {
         std::string key( clean_path );
 
-        // Cache HIT: Return RAM-backed FILE* cookie without opening a disk handle
         auto it = g_ramCache.find( key );
         if ( it != g_ramCache.end() ) {
             RamCookie *rc = new RamCookie{ it->second.data, it->second.size, 0 };
-            return fopencookie( rc, "rb", ram_funcs );
+            FILE *f = fopencookie( rc, "rb", ram_funcs );
+            if ( f ) {
+                return f;
+            }
+            delete rc; // Clean up metadata if fopencookie failed
         }
     }
 
-    // Cache MISS: Attempt to open standard file from disk using real C library symbol
+    // Cache MISS: Open standard file handle from disk
     FILE *disk_f = __real_fopen( clean_path, mode );
     if ( !disk_f ) {
         return NULL;
     }
 
-    // Intercept read operations for .pk3 archives to populate cache
-    if ( is_pk3 ) {
-        std::string key( clean_path );
+	// Stream buffer for SD card reading
+	if ( is_read_mode ) {
+		setvbuf( disk_f, NULL, _IOFBF, 64 * 1024 );
+	}
 
+    // Attempt memory-budgeted caching for .pk3 archives
+    if ( is_pk3 ) {
         fseek( disk_f, 0, SEEK_END );
         long file_size = ftell( disk_f );
-        
-        // Always reset file pointer to the beginning before attempting allocation/reads
         fseek( disk_f, 0, SEEK_SET );
 
         if ( file_size > 0 ) {
-            char *cached_data = (char *)malloc( file_size );
-            if ( cached_data ) {
+            size_t req_size = (size_t)file_size;
 
-                // Expand the stream's internal buffer to 1MB to maximize SD card burst speed
-                setvbuf( disk_f, NULL, _IOFBF, 1024 * 1024 );
+            // Query current heap free space from Circle
+            size_t free_heap = CMemorySystem::Get()->GetHeapFreeSpace( HEAP_ANY );
 
-                // Read in large blocks to prevent C-library / FAT overhead
-                constexpr size_t BLOCK_SIZE = 32 * 1024; 
-                size_t total_bytes_read = 0;
-                bool read_error = false;
+            // Cache if free heap can comfortably cover the file AND keep our RAM cushion
+            bool safe_to_cache = ( free_heap > ( req_size + MIN_RAM_CUSHION ) );
 
-                Com_Printf( "Please wait: Loading %s", clean_path );
-                while ( total_bytes_read < (size_t)file_size ) {
-                    size_t bytes_to_read = BLOCK_SIZE;
-                    if ( total_bytes_read + bytes_to_read > (size_t)file_size ) {
-                        bytes_to_read = (size_t)file_size - total_bytes_read;
+            if ( safe_to_cache ) {
+                char *cached_data = (char *)malloc( req_size );
+                if ( cached_data ) {
+
+
+                    constexpr size_t BLOCK_SIZE = 32 * 1024;
+                    size_t total_bytes_read = 0;
+                    bool read_error = false;
+
+                    Com_Printf( "Caching %s (%ld MB)...\n", clean_path, file_size / ( 1024 * 1024 ) );
+
+                    while ( total_bytes_read < req_size ) {
+                        size_t bytes_to_read = BLOCK_SIZE;
+                        if ( total_bytes_read + bytes_to_read > req_size ) {
+                            bytes_to_read = req_size - total_bytes_read;
+                        }
+
+                        size_t read_count = fread( cached_data + total_bytes_read, 1, bytes_to_read, disk_f );
+                        if ( read_count != bytes_to_read ) {
+                            read_error = true;
+                            break;
+                        }
+
+                        total_bytes_read += read_count;
+
+                        // Yield execution to allow scheduler and background tasks to run
+                        CScheduler::Get()->Yield();
                     }
 
-                    size_t read_count = fread( cached_data + total_bytes_read, 1, bytes_to_read, disk_f );                    
-					
-					// Did we get what we asked for?
-					if (read_count != bytes_to_read) {
-						read_error = true;
-						break;
-					}
+                    if ( !read_error && total_bytes_read == req_size ) {
+                        __real_fclose( disk_f );
 
-					total_bytes_read += read_count;
+                        std::string key( clean_path );
+                        g_ramCache[key] = CachedFile{ cached_data, req_size };
 
+                        RamCookie *rc = new RamCookie{ cached_data, req_size, 0 };
+                        FILE *mem_f = fopencookie( rc, "rb", ram_funcs );
+                        if ( mem_f ) {
+                            return mem_f;
+                        }
 
-                    // yield to prevent long blocking reads from stalling other tasks
-					// such as the network thread or the scheduler itself
-                    CScheduler::Get()->Yield();
- 
+                        delete rc;
+                    }
+
+                    // On read failure or fopencookie error, free memory and fall back
+                    free( cached_data );
+                    fseek( disk_f, 0, SEEK_SET );
                 }
-
-                if ( !read_error && total_bytes_read == (size_t)file_size ) {
-                    __real_fclose( disk_f );
-
-                    g_ramCache[key] = CachedFile{ cached_data, (size_t)file_size };
-
-                    RamCookie *rc = new RamCookie{ cached_data, (size_t)file_size, 0 };
-                    return fopencookie( rc, "rb", ram_funcs );
-                }
-
-                // If read failed, clean up allocated buffer and fall back to disk stream
-                free( cached_data );
-                fseek( disk_f, 0, SEEK_SET );
+            } else {
+                //Com_Printf( "NOT Caching %s (Size: %ld MB, Free Heap: %ld MB, Cushion: %ld MB)\n",
+                //            clean_path, file_size / ( 1024 * 1024 ), free_heap / ( 1024 * 1024 ), MIN_RAM_CUSHION / ( 1024 * 1024 ) );
             }
         }
     }
 
-    // Default stream buffer for non-PK3 disk handles or un-cached PK3 fallbacks
-    if ( is_read_mode ) {
-        setvbuf( disk_f, NULL, _IOFBF, 64 * 1024 );
-    }
     return disk_f;
 }
 
@@ -381,19 +398,16 @@ int Sys_Milliseconds( void ) {
     uint64_t current_ticks = CTimer::GetClockTicks64();
 
     if ( start_ticks == 0 ) {
-        // CTimer::GetClockTicks64() returns microseconds as 64-bit unsigned (never wraps in our lifetime)
         start_ticks = current_ticks;
 		last_yield_ticks = current_ticks;
     }
 
-	// Rate-limit scheduler yields: Only yield if at least 1.5ms (1500 us) 
-    // have elapsed since the last background task slice.
+	// Rate-limit scheduler yields 
     if ( current_ticks - last_yield_ticks >= 100 ) {
         last_yield_ticks = current_ticks;
         CScheduler::Get()->Yield();
     }
 
-    // Calculate elapsed milliseconds relative to system start
     return (int)( ( current_ticks - start_ticks ) / 1000 );
 }
 
